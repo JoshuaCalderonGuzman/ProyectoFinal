@@ -3,13 +3,20 @@ package com.proyectofinal.ui.theme
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.proyectofinal.ui.theme.Typography
 
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
@@ -56,3 +63,27 @@ fun ProyectoFinalTheme(
         content = content
     )
 }
+
+@Composable
+fun NotasAppTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit
+) {
+    val colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()
+
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = _root_ide_package_.androidx.compose.material3.Typography(
+            bodyMedium = TextStyle(fontSize = 16.sp),
+            headlineMedium = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
+            titleMedium = TextStyle(fontSize = 18.sp)
+        ),
+        shapes = Shapes(
+            small = RoundedCornerShape(8.dp),
+            medium = RoundedCornerShape(12.dp),
+            large = RoundedCornerShape(20.dp)
+        ),
+        content = content
+    )
+}
+
