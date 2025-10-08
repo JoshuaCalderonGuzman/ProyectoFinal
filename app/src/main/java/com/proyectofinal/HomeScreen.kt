@@ -60,17 +60,17 @@ fun HomeScreen() {
                 Spacer(Modifier.height(16.dp))
                 SectionHeader(title = "Tareas", icon = Icons.Default.Refresh)
 
-                ItemRow(title = "Título de la tarea")
-                ItemRow(title = "Título de la tarea")
-                ItemRow(title = "Título de la tarea")
+                ItemRow(title = "Tarea 1")
+                ItemRow(title = "Tarea 2")
+                ItemRow(title = "Tarea n")
 
                 Spacer(Modifier.height(16.dp))
                 SectionHeader(title = "Notas")
 
-                ItemRow(title = "Título de la nota")
-                ItemRow(title = "Título de la nota")
-                ItemRow(title = "Título de la nota")
-                ItemRow(title = "Título de la nota")
+                ItemRow(title = "Nota 1")
+                ItemRow(title = "Nota 2")
+                ItemRow(title = "Nota 3")
+                ItemRow(title = "Nota n")
             }
         }
     }
@@ -106,7 +106,7 @@ fun SectionHeader(title: String, icon: androidx.compose.ui.graphics.vector.Image
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier
-                    .size(24.dp)
+                    .size(22.dp)
                     .clickable { /* Acción */ }
             )
         }
@@ -130,7 +130,7 @@ fun ItemRow(title: String) {
             IconButton(
                 onClick = { /* Eliminar */ },
                 modifier = Modifier
-                    .size(30.dp)
+                    .size(28.dp)
                     .clip(CircleShape)
                     .background(Color.Red)
             ) {
@@ -144,7 +144,7 @@ fun ItemRow(title: String) {
             IconButton(
                 onClick = { /* Editar */ },
                 modifier = Modifier
-                    .size(30.dp)
+                    .size(28.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,

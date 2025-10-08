@@ -128,7 +128,7 @@ fun ArchivoCard(nombre: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
-                .size(80.dp)
+                .size(76.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         )
@@ -140,7 +140,7 @@ fun ArchivoCard(nombre: String) {
 fun AddArchivoButton() {
     Box(
         modifier = Modifier
-            .size(80.dp)
+            .size(76.dp)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
@@ -158,12 +158,12 @@ fun TareaItem(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
             .padding(8.dp)
     ) {
         Surface(
-            modifier = Modifier.size(64.dp),
+            modifier = Modifier.size(58.dp),
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surfaceVariant,
             tonalElevation = 3.dp,
@@ -174,7 +174,7 @@ fun TareaItem(
                 Icon(
                     icon,
                     contentDescription = text,
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(38.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -194,7 +194,7 @@ fun CircularCheckbox(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
             .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = 7.dp, vertical = 4.dp)
     ) {
         Surface(
             modifier = Modifier.size(24.dp),
