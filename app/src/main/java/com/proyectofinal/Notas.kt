@@ -8,11 +8,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -26,22 +22,52 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.*
+import com.proyectofinal.data.Item // Asegúrate de importar Item
+import com.proyectofinal.viewmodel.ItemViewModel // Asegúrate de importar ItemViewModel
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NotaScreen() {
-    var checked by remember { mutableStateOf(false) }
+fun NotaScreen(
+    itemId: Int, // ID del item (0 para nuevo)
+    viewModel: ItemViewModel, // ViewModel inyectado
+    onBack: () -> Unit // Acción de navegación (regreso)
+) {
+    // El ítem actual cargado por el ViewModel (puede ser null si es nuevo)
+    val initialItem = viewModel.currentItem
+
+    // 1. ESTADOS EDITABLES
+    // Usar valores del item existente o predeterminados si es nuevo
+    var title by remember { mutableStateOf(initialItem?.title ?: "Titulo de la nota") }
+    var description by remember { mutableStateOf(initialItem?.description ?: "Escriba aquí la descripción...") }
+    var isTask by remember { mutableStateOf(initialItem?.isTask ?: false) }
+    var isCompleted by remember { mutableStateOf(initialItem?.isCompleted ?: false) }
+
+    // 2. LÓGICA DE GUARDADO
+    val onSaveAction: () -> Unit = {
+        val itemToSave = Item(
+            id = itemId, // 0 para nuevo, ID existente para editar
+            title = title,
+            // Guardar solo si el texto no es el placeholder (o solo el texto si es diferente)
+            description = description.takeIf { it != "Escriba aquí la descripción..." } ?: "",
+            isTask = isTask,
+            isCompleted = isCompleted
+        )
+        viewModel.saveItem(itemToSave) // Ejecuta la lógica de Insert/Update
+        onBack() // Regresa a la pantalla anterior
+    }
+
     Scaffold(
-        topBar = {var checked by remember { mutableStateOf(false) }
+        topBar = {
             CenterAlignedTopAppBar(
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = { /* Acción regresar */ }) {
+                    IconButton(onClick = onBack) { // Acción regresar (usa onBack)
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* Acción guardar */ }) {
+                    IconButton(onClick = onSaveAction) { // Acción guardar (usa onSaveAction)
                         Icon(Icons.Default.Done, contentDescription = "Guardar")
                     }
                 }
@@ -56,24 +82,26 @@ fun NotaScreen() {
                 .fillMaxSize(),
             horizontalAlignment = Alignment.Start
         ) {
-            Text(
-                text = "Titulo de la nota",
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+            // **Caja de Texto: Título**
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = { Text("Titulo de la nota") },
+                textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                text = "Descripción",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-            )
-
-            Text(
-                text = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. " +
-                        "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s...",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-                lineHeight = 20.sp
+            // **Caja de Texto: Descripción**
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                label = { Text("Descripción") },
+                textStyle = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false) // Permite múltiples líneas
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -101,11 +129,22 @@ fun NotaScreen() {
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Checkbox: Es Tarea
                 CircularCheckbox(
                     text = "Tarea",
-                    checked = checked,
-                    onCheckedChange = { checked = it }
+                    checked = isTask,
+                    onCheckedChange = { isTask = it } // Toggles Task mode
                 )
+
+                // Checkbox: Tarea Completa (SOLO visible si es Tarea)
+                if (isTask) {
+                    CircularCheckbox(
+                        text = "Completa",
+                        checked = isCompleted,
+                        onCheckedChange = { isCompleted = it } // Toggles completion status
+                    )
+                }
+
                 TareaItem(
                     icon = Icons.Default.Call,
                     text = "Audio",
@@ -117,11 +156,12 @@ fun NotaScreen() {
                     text = "Calendario",
                     onClick = { /* Acción para calendario */ }
                 )
-
             }
         }
     }
 }
+
+// ... El resto de los Composable helpers (ArchivoCard, AddArchivoButton, TareaItem, CircularCheckbox)
 
 @Composable
 fun ArchivoCard(nombre: String) {
@@ -183,6 +223,7 @@ fun TareaItem(
         Text(text = text, style = MaterialTheme.typography.bodyMedium)
     }
 }
+
 @Composable
 fun CircularCheckbox(
     text: String,

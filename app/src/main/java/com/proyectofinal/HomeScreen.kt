@@ -1,4 +1,5 @@
 package com.proyectofinal
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,20 +12,33 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.proyectofinal.data.Item
+import com.proyectofinal.viewmodel.ItemViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    viewModel: ItemViewModel,
+    onNoteClick: (Int) -> Unit, //Parámetro de navegación (Editar)
+    onAddNewClick: () -> Unit //Parámetro de navegación (Crear)
+) {
+    //Recolectar datos en tiempo real de la base de datos a través del ViewModel
+    val notes by viewModel.allNotes.collectAsState(initial = emptyList())
+    val tasks by viewModel.allTasks.collectAsState(initial = emptyList())
+
     MaterialTheme(
         colorScheme = darkColorScheme(),
         typography = Typography(
@@ -38,7 +52,7 @@ fun HomeScreen() {
         )
     ) {
         Scaffold(
-            floatingActionButton = { FloatingAddButton() },
+            floatingActionButton = { FloatingAddButton(onAddNewClick) }, //Usar la acción de navegación
             containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
             Column(
@@ -60,21 +74,34 @@ fun HomeScreen() {
                 Spacer(Modifier.height(16.dp))
                 SectionHeader(title = "Tareas", icon = Icons.Default.Refresh)
 
-                ItemRow(title = "Tarea 1")
-                ItemRow(title = "Tarea 2")
-                ItemRow(title = "Tarea n")
+                //LISTA DE TAREAS DINÁMICA
+                tasks.forEach { task ->
+                    ItemRow(
+                        item = task,
+                        onDelete = { viewModel.deleteItem(task) },
+                        onEdit = { onNoteClick(task.id) },
+                        onToggleComplete = { viewModel.toggleTaskCompletion(task) }
+                    )
+                }
 
                 Spacer(Modifier.height(16.dp))
                 SectionHeader(title = "Notas")
 
-                ItemRow(title = "Nota 1")
-                ItemRow(title = "Nota 2")
-                ItemRow(title = "Nota 3")
-                ItemRow(title = "Nota n")
+                // 2. LISTA DE NOTAS DINÁMICA
+                notes.forEach { note ->
+                    ItemRow(
+                        item = note,
+                        onDelete = { viewModel.deleteItem(note) }, // Acción de eliminar
+                        onEdit = { onNoteClick(note.id) }, // Acción de editar
+                        onToggleComplete = { /* No-op para notas */ }
+                    )
+                }
             }
         }
     }
 }
+
+// ... SearchBar y SectionHeader (sin cambios)
 
 @Composable
 fun SearchBar() {
@@ -107,28 +134,42 @@ fun SectionHeader(title: String, icon: androidx.compose.ui.graphics.vector.Image
                 contentDescription = null,
                 modifier = Modifier
                     .size(22.dp)
-                    .clickable { /* Acción */ }
+                    .clickable { /* Acción de refrescar */ }
             )
         }
     }
 }
 
+
+// Componente ItemRow actualizado para recibir el objeto Item y acciones
 @Composable
-fun ItemRow(title: String) {
+fun ItemRow(
+    item: Item,
+    onDelete: () -> Unit,
+    onEdit: () -> Unit,
+    onToggleComplete: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth(0.9f)
-            .background(Color.Gray, shape = RoundedCornerShape(4.dp))
+            // Cambiar color basado en la finalización de la tarea
+            .background(
+                if (item.isTask && item.isCompleted) Color(0xFF388E3C) else Color.Gray,
+                shape = RoundedCornerShape(4.dp)
+            )
             .padding(horizontal = 8.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(4.dp)),
+            .clip(RoundedCornerShape(4.dp))
+            .clickable(onClick = onToggleComplete), // Clic para completar/descompletar
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, color = Color.White)
+        // Muestra el título
+        Text(item.title, color = Color.White)
 
         Row {
+            // Botón de eliminar
             IconButton(
-                onClick = { /* Eliminar */ },
+                onClick = onDelete, // Usar la acción de eliminar
                 modifier = Modifier
                     .size(28.dp)
                     .clip(CircleShape)
@@ -141,8 +182,9 @@ fun ItemRow(title: String) {
                 )
             }
 
+            // Botón de editar
             IconButton(
-                onClick = { /* Editar */ },
+                onClick = onEdit, // Usar la acción de editar/navegar
                 modifier = Modifier
                     .size(28.dp)
             ) {
@@ -156,10 +198,11 @@ fun ItemRow(title: String) {
     }
 }
 
+// Componente FloatingAddButton actualizado para recibir y ejecutar la acción
 @Composable
-fun FloatingAddButton() {
+fun FloatingAddButton(onClick: () -> Unit) {
     FloatingActionButton(
-        onClick = { /* Agregar nueva nota/tarea */ },
+        onClick = onClick, // Acción de navegación
         shape = CircleShape,
         containerColor = Color.White,
         contentColor = Color.Black,
