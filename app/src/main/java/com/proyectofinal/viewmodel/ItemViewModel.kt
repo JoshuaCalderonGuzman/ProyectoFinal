@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-// Sealed class para representar los estados de la UI
+//Sealed class para representar los estados de la UI
 sealed class ItemUiState {
     object Loading : ItemUiState()
     data class Success(val items: List<Item>) : ItemUiState()
