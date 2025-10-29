@@ -1,3 +1,26 @@
 <resources>
-    <string name="app_name">Proyecto Final</string>
+    <!-- HomeScreen -->
+    <string name="app_name" translatable="false">Proyecto Final</string>
+    <string name="notas">Notas</string>
+    <string name="titulo">HOME</string>
+    <string name="buscar">Buscar</string>
+    <string name="tareas">Tareas</string>
+    <string name="eliminar">Eliminar</string>
+    <string name="editar">Editar</string>
+    <string name="agregar">Agregar</string>
+    <string name="refrescar">Refrescar</string>
+    <!-- Notas -->
+    <string name="volver">Volver</string>
+    <string name="guardar">Guardar</string>
+    <string name="placeholder_title">Escriba el título aquí...</string>
+    <string name="placeholder_description">Escriba aquí la descripción...</string>
+    <string name="archivos">Archivos</string>
+    <string name="anotacion">Anotación</string>
+    <string name="agregar_archivos">Agregar archivo</string>
+    <string name="tarea">Tarea</string>
+    <string name="completado">Completa</string>
+    <string name="audio">Audio</string>
+    <string name="calendario">Calendario</string>
+    <string name="seleccionado">Seleccionado</string>
+
 </resources>

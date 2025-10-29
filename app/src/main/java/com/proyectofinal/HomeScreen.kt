@@ -21,10 +21,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.proyectofinal.R  // ← IMPORTANTE: Para stringResource
 import com.proyectofinal.data.Item
 import com.proyectofinal.viewmodel.ItemViewModel
 
@@ -63,7 +65,7 @@ fun HomeScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "HOME",
+                    text = stringResource(R.string.titulo),
                     style = MaterialTheme.typography.titleLarge,
                     textAlign = TextAlign.Center
                 )
@@ -72,7 +74,7 @@ fun HomeScreen(
                 SearchBar()
 
                 Spacer(Modifier.height(16.dp))
-                SectionHeader(title = "Tareas", icon = Icons.Default.Refresh)
+                SectionHeader(title = stringResource(R.string.tareas), icon = Icons.Default.Refresh)
 
                 //LISTA DE TAREAS DINÁMICA
                 tasks.forEach { task ->
@@ -85,7 +87,7 @@ fun HomeScreen(
                 }
 
                 Spacer(Modifier.height(16.dp))
-                SectionHeader(title = "Notas")
+                SectionHeader(title = stringResource(R.string.notas))
 
                 // 2. LISTA DE NOTAS DINÁMICA
                 notes.forEach { note ->
@@ -109,7 +111,7 @@ fun SearchBar() {
     OutlinedTextField(
         value = textState.value,
         onValueChange = { textState.value = it },
-        placeholder = { Text("Buscar") },
+        placeholder = { Text(stringResource(R.string.buscar)) },
         shape = RoundedCornerShape(50),
         modifier = Modifier
             .fillMaxWidth(0.9f)
@@ -131,7 +133,7 @@ fun SectionHeader(title: String, icon: androidx.compose.ui.graphics.vector.Image
         if (icon != null) {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
+                contentDescription = stringResource(R.string.refrescar),
                 modifier = Modifier
                     .size(22.dp)
                     .clickable { /* Acción de refrescar */ }
@@ -139,7 +141,6 @@ fun SectionHeader(title: String, icon: androidx.compose.ui.graphics.vector.Image
         }
     }
 }
-
 
 // Componente ItemRow actualizado para recibir el objeto Item y acciones
 @Composable
@@ -177,7 +178,7 @@ fun ItemRow(
             ) {
                 Icon(
                     imageVector = Icons.Default.Delete,
-                    contentDescription = "Eliminar",
+                    contentDescription = stringResource(R.string.eliminar),
                     tint = Color.White
                 )
             }
@@ -190,7 +191,7 @@ fun ItemRow(
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
-                    contentDescription = "Editar",
+                    contentDescription = stringResource(R.string.editar),
                     tint = Color.White
                 )
             }
@@ -208,6 +209,6 @@ fun FloatingAddButton(onClick: () -> Unit) {
         contentColor = Color.Black,
         modifier = Modifier.size(60.dp)
     ) {
-        Icon(Icons.Default.Add, contentDescription = "Agregar", tint = Color.Black)
+        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.agregar), tint = Color.Black)
     }
 }

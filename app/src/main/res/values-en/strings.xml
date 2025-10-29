@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- HomeScreen -->
+    <string name="titulo">HOME</string>
+    <string name="buscar">Search</string>
+    <string name="tareas">Tasks</string>
+    <string name="notas">Notes</string>
+    <string name="eliminar">Delete</string>
+    <string name="editar">Edit</string>
+    <string name="agregar">Add</string>
+    <string name="refrescar">Refresh</string>
+
+    <!-- Notas -->
+    <string name="volver">Back</string>
+    <string name="guardar">Save</string>
+    <string name="placeholder_title">Enter title here...</string>
+    <string name="placeholder_description">Write your description here...</string>
+    <string name="archivos">Files</string>
+    <string name="anotacion">Annotation</string>
+    <string name="agregar_archivos">Add file</string>
+    <string name="tarea">Task</string>
+    <string name="completado">Completed</string>
+    <string name="audio">Audio</string>
+    <string name="calendario">Calendar</string>
+    <string name="seleccionado">Checked</string>
+
+</resources>

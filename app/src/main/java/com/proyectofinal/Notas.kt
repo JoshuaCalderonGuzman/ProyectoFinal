@@ -1,6 +1,5 @@
 package com.proyectofinal
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,20 +10,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.runtime.*
+import com.proyectofinal.R
 import com.proyectofinal.data.Item // Asegúrate de importar Item
 import com.proyectofinal.viewmodel.ItemViewModel // Asegúrate de importar ItemViewModel
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,23 +35,39 @@ fun NotaScreen(
 
     // 1. ESTADOS EDITABLES
     // Usar valores del item existente o predeterminados si es nuevo
-    var title by remember { mutableStateOf(initialItem?.title ?: "Titulo de la nota") }
-    var description by remember { mutableStateOf(initialItem?.description ?: "Escriba aquí la descripción...") }
+    var title by remember { mutableStateOf(initialItem?.title ?: "") }
+    var description by remember { mutableStateOf(initialItem?.description ?: "") }
     var isTask by remember { mutableStateOf(initialItem?.isTask ?: false) }
     var isCompleted by remember { mutableStateOf(initialItem?.isCompleted ?: false) }
 
+    //Placeholder
+    val placeholderTitle = stringResource(R.string.placeholder_title)
+    val placeholderText = stringResource(R.string.placeholder_description)
+
+
+
+
+    // Capturar valores actuales para usar en la lambda (evita problemas de estado)
+    val currentTitle by rememberUpdatedState(title)
+    val currentDescription by rememberUpdatedState(description)
+    val currentIsTask by rememberUpdatedState(isTask)
+    val currentIsCompleted by rememberUpdatedState(isCompleted)
+
     // 2. LÓGICA DE GUARDADO
-    val onSaveAction: () -> Unit = {
-        val itemToSave = Item(
-            id = itemId, // 0 para nuevo, ID existente para editar
-            title = title,
-            // Guardar solo si el texto no es el placeholder (o solo el texto si es diferente)
-            description = description.takeIf { it != "Escriba aquí la descripción..." } ?: "",
-            isTask = isTask,
-            isCompleted = isCompleted
-        )
-        viewModel.saveItem(itemToSave) // Ejecuta la lógica de Insert/Update
-        onBack() // Regresa a la pantalla anterior
+    // Esta lambda es () -> Unit, no @Composable, por eso no hay error
+    val onSaveAction = remember {
+        {
+            val itemToSave = Item(
+                id = itemId, // 0 para nuevo, ID existente para editar
+                title = if (currentTitle == placeholderTitle || currentTitle.isBlank()) "" else currentTitle,
+                // Guardar solo si el texto no es el placeholder (o solo el texto si es diferente)
+                description = if (currentDescription == placeholderText || currentDescription.isBlank()) "" else currentDescription,
+                isTask = currentIsTask,
+                isCompleted = currentIsCompleted
+            )
+            viewModel.saveItem(itemToSave) // Ejecuta la lógica de Insert/Update
+            onBack() // Regresa a la pantalla anterior
+        }
     }
 
     Scaffold(
@@ -63,12 +76,12 @@ fun NotaScreen(
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) { // Acción regresar (usa onBack)
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.volver))
                     }
                 },
                 actions = {
                     IconButton(onClick = onSaveAction) { // Acción guardar (usa onSaveAction)
-                        Icon(Icons.Default.Done, contentDescription = "Guardar")
+                        Icon(Icons.Default.Done, contentDescription = stringResource(R.string.guardar))
                     }
                 }
             )
@@ -86,7 +99,8 @@ fun NotaScreen(
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = { Text("Titulo de la nota") },
+                label = {Text(text = placeholderTitle,
+                              color = LocalContentColor.current.copy(alpha = 0.7f))},
                 textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -97,7 +111,8 @@ fun NotaScreen(
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Descripción") },
+                label = { Text(text = placeholderText,
+                                color = LocalContentColor.current.copy(alpha = 0.7f)) },
                 textStyle = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -107,7 +122,7 @@ fun NotaScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Archivos",
+                text = stringResource(R.string.archivos),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
             )
 
@@ -115,7 +130,7 @@ fun NotaScreen(
 
             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(2) {
-                    ArchivoCard("Anotacion")
+                    ArchivoCard(stringResource(R.string.anotacion))
                 }
                 item {
                     AddArchivoButton()
@@ -131,7 +146,7 @@ fun NotaScreen(
             ) {
                 // Checkbox: Es Tarea
                 CircularCheckbox(
-                    text = "Tarea",
+                    text = stringResource(R.string.tarea),
                     checked = isTask,
                     onCheckedChange = { isTask = it } // Toggles Task mode
                 )
@@ -139,7 +154,7 @@ fun NotaScreen(
                 // Checkbox: Tarea Completa (SOLO visible si es Tarea)
                 if (isTask) {
                     CircularCheckbox(
-                        text = "Completa",
+                        text = stringResource(R.string.completado),
                         checked = isCompleted,
                         onCheckedChange = { isCompleted = it } // Toggles completion status
                     )
@@ -147,13 +162,13 @@ fun NotaScreen(
 
                 TareaItem(
                     icon = Icons.Default.Call,
-                    text = "Audio",
+                    text = stringResource(R.string.audio),
                     onClick = { /* Acción para Audio */ }
                 )
 
                 TareaItem(
                     icon = Icons.Default.DateRange,
-                    text = "Calendario",
+                    text = stringResource(R.string.calendario),
                     onClick = { /* Acción para calendario */ }
                 )
             }
@@ -185,7 +200,7 @@ fun AddArchivoButton() {
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        Icon(Icons.Outlined.Add, contentDescription = "Agregar archivo")
+        Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.agregar_archivos))
     }
 }
 
@@ -246,7 +261,7 @@ fun CircularCheckbox(
             if (checked) {
                 Icon(
                     imageVector = Icons.Default.Check,
-                    contentDescription = "Seleccionado",
+                    contentDescription = stringResource(R.string.seleccionado),
                     tint = Color.White,
                     modifier = Modifier.padding(4.dp)
                 )

@@ -8,7 +8,7 @@ import com.proyectofinal.data.ItemRepository
 import kotlinx.coroutines.launch
 
 class ItemViewModel(private val repository: ItemRepository) : ViewModel() {
-
+    //Manejar el estado de las pantallas en el viewmodel, obj uistate
     val allNotes = repository.allNotes
     val allTasks = repository.allTasks
 
