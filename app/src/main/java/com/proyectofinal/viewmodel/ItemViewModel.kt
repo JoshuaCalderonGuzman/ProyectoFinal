@@ -14,7 +14,6 @@ import kotlinx.coroutines.launch
 sealed class ItemUiState {
     object Loading : ItemUiState()
     data class Success(val items: List<Item>) : ItemUiState()
-    data class CurrentItemLoaded(val item: Item) : ItemUiState()
     data class Error(val message: String) : ItemUiState()
     object Empty : ItemUiState()
 }
@@ -54,13 +53,12 @@ class ItemViewModel(private val repository: ItemRepository) : ViewModel() {
     }
 
     fun loadItem(itemId: Int) {
-        _uiState.value = ItemUiState.Loading
         viewModelScope.launch {
             try {
                 val item = repository.getItemById(itemId)
                 if (item != null) {
                     _currentItemState.value = item
-                    _uiState.value = ItemUiState.CurrentItemLoaded(item)
+
                 } else {
                     _uiState.value = ItemUiState.Error("Elemento no encontrado")
                 }

@@ -166,9 +166,6 @@ fun HomeScreen(
                             }
                         }
                     }
-                    is ItemUiState.CurrentItemLoaded -> {
-                        // Ignorado en Home
-                    }
                 }
             }
         }
