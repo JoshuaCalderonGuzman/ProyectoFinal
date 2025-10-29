@@ -9,6 +9,8 @@
     <string name="editar">Editar</string>
     <string name="agregar">Agregar</string>
     <string name="refrescar">Refrescar</string>
+
+    <string name="nohay">No hay tareas ni notas</string>
     <!-- Notas -->
     <string name="volver">Volver</string>
     <string name="guardar">Guardar</string>

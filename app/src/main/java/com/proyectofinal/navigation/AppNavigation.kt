@@ -11,34 +11,34 @@ import com.proyectofinal.NotaScreen
 import com.proyectofinal.viewmodel.ItemViewModel
 
 object Routes {
-    //La ruta de la pantalla principal
+    // La ruta de la pantalla principal
     const val HOME = "home"
 
-    //itemId = 0 significa que es un nuevo elemento.
-    //itemId > 0 significa que es un elemento existente para editar.
+    // itemId = 0 significa que es un nuevo elemento.
+    // itemId > 0 significa que es un elemento existente para editar.
     const val NOTA_DETAIL = "nota_detail/{itemId}"
 
-    //Función helper para construir la ruta con el ID
+    // Función helper para construir la ruta con el ID
     fun createNotaDetailRoute(itemId: Int) = "nota_detail/$itemId"
 }
 
 @Composable
 fun AppNavigation(viewModel: ItemViewModel) {
-    val navController = rememberNavController() //Controlador de navegación
+    val navController = rememberNavController() // Controlador de navegación
 
     NavHost(
         navController = navController,
         startDestination = Routes.HOME // La pantalla inicial
     ) {
-        //Ruta de la Pantalla Principal (HOME)
+        // Ruta de la Pantalla Principal (HOME)
         composable(Routes.HOME) {
             HomeScreen(
                 viewModel = viewModel,
-                //Función para navegar a un ítem existente (nota o tarea)
+                // Función para navegar a un ítem existente (nota o tarea)
                 onNoteClick = { itemId ->
                     navController.navigate(Routes.createNotaDetailRoute(itemId))
                 },
-                //Función para navegar y crear un nuevo ítem (se pasa ID = 0)
+                // Función para navegar y crear un nuevo ítem (se pasa ID = 0)
                 onAddNewClick = {
                     navController.navigate(Routes.createNotaDetailRoute(0))
                 }
@@ -48,26 +48,26 @@ fun AppNavigation(viewModel: ItemViewModel) {
         // 2. Ruta de la Pantalla de Detalle (NOTA_DETAIL)
         composable(
             route = Routes.NOTA_DETAIL,
-            //Definición del argumento 'itemId' como entero
+            // Definición del argumento 'itemId' como entero
             arguments = listOf(navArgument("itemId") { type = NavType.IntType })
         ) { backStackEntry ->
 
-            //Extrae el itemId de los argumentos, por defecto 0 si no existe
+            // Extrae el itemId de los argumentos, por defecto 0 si no existe
             val itemId = backStackEntry.arguments?.getInt("itemId") ?: 0
 
-            //Carga del Ítem
+            // === CARGA DEL ÍTEM SEGÚN EL MODO ===
             if (itemId != 0) {
-                //Si el ID es válido, solicita al ViewModel que cargue el ítem para edición
+                // Si el ID es válido, solicita al ViewModel que cargue el ítem para edición
                 viewModel.loadItem(itemId)
             } else {
-                //Si ID = 0 (nuevo ítem), asegura que no haya datos viejos
-                viewModel.currentItem = null
+                // Si ID = 0 (nuevo ítem), limpia el estado actual para evitar datos residuales
+                viewModel.clearCurrentItem() // Usa función del ViewModel (reemplaza currentItem = null)
             }
 
             NotaScreen(
                 itemId = itemId,
                 viewModel = viewModel,
-                //Función de regreso: elimina la pantalla actual de la pila de navegación
+                // Función de regreso: elimina la pantalla actual de la pila de navegación
                 onBack = { navController.popBackStack() }
             )
         }

@@ -3,12 +3,14 @@ package com.proyectofinal
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -28,18 +30,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.proyectofinal.R  // ← IMPORTANTE: Para stringResource
 import com.proyectofinal.data.Item
+import com.proyectofinal.viewmodel.ItemUiState
 import com.proyectofinal.viewmodel.ItemViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: ItemViewModel,
-    onNoteClick: (Int) -> Unit, //Parámetro de navegación (Editar)
-    onAddNewClick: () -> Unit //Parámetro de navegación (Crear)
+    onNoteClick: (Int) -> Unit, // Parámetro de navegación (Editar)
+    onAddNewClick: () -> Unit   // Parámetro de navegación (Crear)
 ) {
-    //Recolectar datos en tiempo real de la base de datos a través del ViewModel
-    val notes by viewModel.allNotes.collectAsState(initial = emptyList())
-    val tasks by viewModel.allTasks.collectAsState(initial = emptyList())
+    // UN SOLO ESTADO: uiState del ViewModel (reemplaza allNotes y allTasks)
+    val uiState by viewModel.uiState.collectAsState()
 
     MaterialTheme(
         colorScheme = darkColorScheme(),
@@ -54,7 +56,7 @@ fun HomeScreen(
         )
     ) {
         Scaffold(
-            floatingActionButton = { FloatingAddButton(onAddNewClick) }, //Usar la acción de navegación
+            floatingActionButton = { FloatingAddButton(onAddNewClick) }, // Acción de navegación
             containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
             Column(
@@ -71,42 +73,116 @@ fun HomeScreen(
                 )
 
                 Spacer(Modifier.height(8.dp))
-                SearchBar()
+                SearchBar() // Barra de búsqueda (aún no funcional)
 
                 Spacer(Modifier.height(16.dp))
-                SectionHeader(title = stringResource(R.string.tareas), icon = Icons.Default.Refresh)
 
-                //LISTA DE TAREAS DINÁMICA
-                tasks.forEach { task ->
-                    ItemRow(
-                        item = task,
-                        onDelete = { viewModel.deleteItem(task) },
-                        onEdit = { onNoteClick(task.id) },
-                        onToggleComplete = { viewModel.toggleTaskCompletion(task) }
-                    )
-                }
+                // === MANEJO CENTRALIZADO DEL ESTADO DE LA UI ===
+                when (uiState) {
+                    is ItemUiState.Loading -> {
+                        // Pantalla de carga
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = Color.White)
+                        }
+                    }
 
-                Spacer(Modifier.height(16.dp))
-                SectionHeader(title = stringResource(R.string.notas))
+                    is ItemUiState.Empty -> {
+                        // No hay elementos
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = stringResource(R.string.nohay),
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
 
-                // 2. LISTA DE NOTAS DINÁMICA
-                notes.forEach { note ->
-                    ItemRow(
-                        item = note,
-                        onDelete = { viewModel.deleteItem(note) }, // Acción de eliminar
-                        onEdit = { onNoteClick(note.id) }, // Acción de editar
-                        onToggleComplete = { /* No-op para notas */ }
-                    )
+                    is ItemUiState.Success -> {
+                        // Lista combinada (tareas + notas)
+                        val allItems = (uiState as ItemUiState.Success).items
+                        val tasks = allItems.filter { it.isTask }
+                        val notes = allItems.filter { !it.isTask }
+
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            // === SECCIÓN TAREAS ===
+                            if (tasks.isNotEmpty()) {
+                                item {
+                                    SectionHeader(
+                                        title = stringResource(R.string.tareas),
+                                        icon = Icons.Default.Refresh
+                                    )
+                                }
+                                items(tasks) { task ->
+                                    ItemRow(
+                                        item = task,
+                                        onDelete = { viewModel.deleteItem(task) },
+                                        onEdit = { onNoteClick(task.id) },
+                                        onToggleComplete = { viewModel.toggleTaskCompletion(task) }
+                                    )
+                                }
+                            }
+
+                            // === SECCIÓN NOTAS ===
+                            if (notes.isNotEmpty()) {
+                                item {
+                                    SectionHeader(title = stringResource(R.string.notas))
+                                }
+                                items(notes) { note ->
+                                    ItemRow(
+                                        item = note,
+                                        onDelete = { viewModel.deleteItem(note) },
+                                        onEdit = { onNoteClick(note.id) },
+                                        onToggleComplete = { /* No-op para notas */ }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    is ItemUiState.Error -> {
+                        // Error con opción de reintento
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "Error: ${(uiState as ItemUiState.Error).message}",
+                                    color = Color.Red,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Button(onClick = { viewModel.loadAllItems() }) {
+                                    Text("Reintentar")
+                                }
+                            }
+                        }
+                    }
+
+                    is ItemUiState.CurrentItemLoaded -> {
+                        // Este estado se maneja en la pantalla de detalle/edición
+                        // Aquí lo ignoramos (no se muestra en Home)
+                    }
                 }
             }
         }
     }
 }
 
-// ... SearchBar y SectionHeader (sin cambios)
+// === COMPONENTES AUXILIARES (sin cambios en funcionalidad) ===
 
 @Composable
 fun SearchBar() {
+    // Estado local para el texto de búsqueda (aún no filtra)
     val textState = remember { mutableStateOf("") }
     OutlinedTextField(
         value = textState.value,
@@ -116,12 +192,16 @@ fun SearchBar() {
         modifier = Modifier
             .fillMaxWidth(0.9f)
             .height(50.dp),
-        singleLine = true
+        singleLine = true,
+        colors = TextFieldDefaults.colors(
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent
+        )
     )
 }
 
 @Composable
-fun SectionHeader(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
+fun SectionHeader(title: String, icon: ImageVector? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth(0.9f)
@@ -129,14 +209,15 @@ fun SectionHeader(title: String, icon: androidx.compose.ui.graphics.vector.Image
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
+        Text(title, style = MaterialTheme.typography.titleMedium, color = Color.White)
         if (icon != null) {
             Icon(
                 imageVector = icon,
                 contentDescription = stringResource(R.string.refrescar),
                 modifier = Modifier
                     .size(22.dp)
-                    .clickable { /* Acción de refrescar */ }
+                    .clickable { /* Acción de refrescar (pendiente) */ },
+                tint = Color.White
             )
         }
     }
@@ -160,17 +241,21 @@ fun ItemRow(
             )
             .padding(horizontal = 8.dp, vertical = 6.dp)
             .clip(RoundedCornerShape(4.dp))
-            .clickable(onClick = onToggleComplete), // Clic para completar/descompletar
+            .clickable(enabled = item.isTask, onClick = onToggleComplete), // Solo tareas se completan
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Muestra el título
-        Text(item.title, color = Color.White)
+        Text(
+            text = item.title,
+            color = Color.White,
+            modifier = Modifier.weight(1f)
+        )
 
         Row {
             // Botón de eliminar
             IconButton(
-                onClick = onDelete, // Usar la acción de eliminar
+                onClick = onDelete, // Acción de eliminar
                 modifier = Modifier
                     .size(28.dp)
                     .clip(CircleShape)
@@ -185,7 +270,7 @@ fun ItemRow(
 
             // Botón de editar
             IconButton(
-                onClick = onEdit, // Usar la acción de editar/navegar
+                onClick = onEdit, // Acción de editar/navegar
                 modifier = Modifier
                     .size(28.dp)
             ) {

@@ -30,46 +30,50 @@ fun NotaScreen(
     viewModel: ItemViewModel, // ViewModel inyectado
     onBack: () -> Unit // Acción de navegación (regreso)
 ) {
-    // El ítem actual cargado por el ViewModel (puede ser null si es nuevo)
-    val initialItem = viewModel.currentItem
+    // === ESTADO DEL ÍTEM ACTUAL (reactivo con StateFlow) ===
+    val currentItem by viewModel.currentItemState.collectAsState()
 
-    // 1. ESTADOS EDITABLES
-    // Usar valores del item existente o predeterminados si es nuevo
-    var title by remember { mutableStateOf(initialItem?.title ?: "") }
-    var description by remember { mutableStateOf(initialItem?.description ?: "") }
-    var isTask by remember { mutableStateOf(initialItem?.isTask ?: false) }
-    var isCompleted by remember { mutableStateOf(initialItem?.isCompleted ?: false) }
+    // Cargar el ítem si es edición (itemId != 0)
+    LaunchedEffect(itemId) {
+        if (itemId != 0) {
+            viewModel.loadItem(itemId)
+        } else {
+            viewModel.clearCurrentItem() // Asegurar estado limpio para nuevo
+        }
+    }
 
-    //Placeholder
+    // === ESTADOS EDITABLES (inicializados con el ítem cargado o vacíos) ===
+    var title by remember(currentItem) { mutableStateOf(currentItem?.title ?: "") }
+    var description by remember(currentItem) { mutableStateOf(currentItem?.description ?: "") }
+    var isTask by remember(currentItem) { mutableStateOf(currentItem?.isTask ?: false) }
+    var isCompleted by remember(currentItem) { mutableStateOf(currentItem?.isCompleted ?: false) }
+
+    // Placeholders desde strings.xml
     val placeholderTitle = stringResource(R.string.placeholder_title)
     val placeholderText = stringResource(R.string.placeholder_description)
 
-
-
-
-    // Capturar valores actuales para usar en la lambda (evita problemas de estado)
+    // === ESTADOS ACTUALIZADOS (para usar en lambda de guardado) ===
     val currentTitle by rememberUpdatedState(title)
     val currentDescription by rememberUpdatedState(description)
     val currentIsTask by rememberUpdatedState(isTask)
     val currentIsCompleted by rememberUpdatedState(isCompleted)
 
-    // 2. LÓGICA DE GUARDADO
-    // Esta lambda es () -> Unit, no @Composable, por eso no hay error
+    // === LÓGICA DE GUARDADO (usando ViewModel) ===
     val onSaveAction = remember {
         {
             val itemToSave = Item(
-                id = itemId, // 0 para nuevo, ID existente para editar
+                id = if (itemId == 0) 0 else itemId, // 0 = nuevo
                 title = if (currentTitle == placeholderTitle || currentTitle.isBlank()) "" else currentTitle,
-                // Guardar solo si el texto no es el placeholder (o solo el texto si es diferente)
                 description = if (currentDescription == placeholderText || currentDescription.isBlank()) "" else currentDescription,
                 isTask = currentIsTask,
-                isCompleted = currentIsCompleted
+                isCompleted = currentIsCompleted && currentIsTask // Solo completado si es tarea
             )
-            viewModel.saveItem(itemToSave) // Ejecuta la lógica de Insert/Update
-            onBack() // Regresa a la pantalla anterior
+            viewModel.saveItem(itemToSave) // Inserta o actualiza
+            onBack() // Regresa a Home
         }
     }
 
+    // === UI PRINCIPAL ===
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -80,7 +84,7 @@ fun NotaScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onSaveAction) { // Acción guardar (usa onSaveAction)
+                    IconButton(onClick = onSaveAction) { // Acción guardar
                         Icon(Icons.Default.Done, contentDescription = stringResource(R.string.guardar))
                     }
                 }
@@ -99,10 +103,15 @@ fun NotaScreen(
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = {Text(text = placeholderTitle,
-                              color = LocalContentColor.current.copy(alpha = 0.7f))},
+                label = {
+                    Text(
+                        text = placeholderTitle,
+                        color = LocalContentColor.current.copy(alpha = 0.7f)
+                    )
+                },
                 textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -111,12 +120,17 @@ fun NotaScreen(
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text(text = placeholderText,
-                                color = LocalContentColor.current.copy(alpha = 0.7f)) },
+                label = {
+                    Text(
+                        text = placeholderText,
+                        color = LocalContentColor.current.copy(alpha = 0.7f)
+                    )
+                },
                 textStyle = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f, fill = false) // Permite múltiples líneas
+                    .weight(1f, fill = false),
+                maxLines = 10
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -148,15 +162,15 @@ fun NotaScreen(
                 CircularCheckbox(
                     text = stringResource(R.string.tarea),
                     checked = isTask,
-                    onCheckedChange = { isTask = it } // Toggles Task mode
+                    onCheckedChange = { isTask = it }
                 )
 
-                // Checkbox: Tarea Completa (SOLO visible si es Tarea)
+                // Checkbox: Tarea Completa (solo si es tarea)
                 if (isTask) {
                     CircularCheckbox(
                         text = stringResource(R.string.completado),
                         checked = isCompleted,
-                        onCheckedChange = { isCompleted = it } // Toggles completion status
+                        onCheckedChange = { isCompleted = it }
                     )
                 }
 
@@ -176,7 +190,7 @@ fun NotaScreen(
     }
 }
 
-// ... El resto de los Composable helpers (ArchivoCard, AddArchivoButton, TareaItem, CircularCheckbox)
+// === COMPONENTES AUXILIARES  ===
 
 @Composable
 fun ArchivoCard(nombre: String) {

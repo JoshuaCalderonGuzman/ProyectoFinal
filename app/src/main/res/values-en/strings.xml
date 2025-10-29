@@ -9,7 +9,7 @@
     <string name="editar">Edit</string>
     <string name="agregar">Add</string>
     <string name="refrescar">Refresh</string>
-
+    <string name="nohay">There are no tasks or notes</string>
     <!-- Notas -->
     <string name="volver">Back</string>
     <string name="guardar">Save</string>
