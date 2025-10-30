@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.proyectofinal.R
 import com.proyectofinal.data.Item // Asegúrate de importar Item
+import com.proyectofinal.viewmodel.ItemUiState
 import com.proyectofinal.viewmodel.ItemViewModel // Asegúrate de importar ItemViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,7 +31,8 @@ fun NotaScreen(
     viewModel: ItemViewModel, // ViewModel inyectado
     onBack: () -> Unit // Acción de navegación (regreso)
 ) {
-    // === ESTADO DEL ÍTEM ACTUAL (reactivo con StateFlow) ===
+    // ESTADO DEL ÍTEM ACTUAL
+    val uiState by viewModel.uiState.collectAsState()
     val currentItem by viewModel.currentItemState.collectAsState()
 
     // Cargar el ítem si es edición (itemId != 0)
@@ -42,38 +44,54 @@ fun NotaScreen(
         }
     }
 
-    // === ESTADOS EDITABLES (inicializados con el ítem cargado o vacíos) ===
-    var title by remember(currentItem) { mutableStateOf(currentItem?.title ?: "") }
-    var description by remember(currentItem) { mutableStateOf(currentItem?.description ?: "") }
-    var isTask by remember(currentItem) { mutableStateOf(currentItem?.isTask ?: false) }
-    var isCompleted by remember(currentItem) { mutableStateOf(currentItem?.isCompleted ?: false) }
-
-    // Placeholders desde strings.xml
-    val placeholderTitle = stringResource(R.string.placeholder_title)
-    val placeholderText = stringResource(R.string.placeholder_description)
-
-    // === ESTADOS ACTUALIZADOS (para usar en lambda de guardado) ===
-    val currentTitle by rememberUpdatedState(title)
-    val currentDescription by rememberUpdatedState(description)
-    val currentIsTask by rememberUpdatedState(isTask)
-    val currentIsCompleted by rememberUpdatedState(isCompleted)
-
-    // === LÓGICA DE GUARDADO (usando ViewModel) ===
-    val onSaveAction = remember {
-        {
-            val itemToSave = Item(
-                id = if (itemId == 0) 0 else itemId, // 0 = nuevo
-                title = if (currentTitle == placeholderTitle || currentTitle.isBlank()) "" else currentTitle,
-                description = if (currentDescription == placeholderText || currentDescription.isBlank()) "" else currentDescription,
-                isTask = currentIsTask,
-                isCompleted = currentIsCompleted && currentIsTask // Solo completado si es tarea
-            )
-            viewModel.saveItem(itemToSave) // Inserta o actualiza
-            onBack() // Regresa a Home
+    //Manejamos estados globales
+    when (uiState) {
+        is ItemUiState.Loading -> {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            return
         }
+        is ItemUiState.Error -> {
+            val msg = (uiState as ItemUiState.Error).message
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Error: $msg", color = Color.Red)
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = { viewModel.loadAllItems()}) {
+                        Text("Reintentar")
+                    }
+                }
+            }
+            return
+        }
+        else -> Unit
     }
 
-    // === UI PRINCIPAL ===
+
+    //  Ítem actual
+    val item = currentItem ?: Item(id = 0, title = "", description = "", isTask = false, isCompleted = false)
+
+    // Estado local solo para edición
+    var title by remember(item) { mutableStateOf(item.title) }
+    var description by remember(item) { mutableStateOf(item.description ?: "") }
+    var isTask by remember(item) { mutableStateOf(item.isTask) }
+    var isCompleted by remember(item) { mutableStateOf(item.isCompleted) }
+
+
+    //Guardar
+    val saveAndBack = {
+        val toSave = item.copy(
+            title = title.trim(),
+            description = description.trim(),
+            isTask = isTask,
+            isCompleted = isTask && isCompleted
+        )
+        viewModel.saveItem(toSave)
+        onBack()
+    }
+
+    //UI PRINCIPAL
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -84,7 +102,7 @@ fun NotaScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onSaveAction) { // Acción guardar
+                    IconButton(onClick = saveAndBack) { // Acción guardar
                         Icon(Icons.Default.Done, contentDescription = stringResource(R.string.guardar))
                     }
                 }
@@ -103,12 +121,10 @@ fun NotaScreen(
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = {
-                    Text(
-                        text = placeholderTitle,
-                        color = LocalContentColor.current.copy(alpha = 0.7f)
-                    )
-                },
+                label = { Text(
+                    text = stringResource(R.string.placeholder_title),
+                    color = LocalContentColor.current.copy(alpha = 0.7f)
+                ) },
                 textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
@@ -122,7 +138,7 @@ fun NotaScreen(
                 onValueChange = { description = it },
                 label = {
                     Text(
-                        text = placeholderText,
+                        text =stringResource(R.string.placeholder_description),
                         color = LocalContentColor.current.copy(alpha = 0.7f)
                     )
                 },

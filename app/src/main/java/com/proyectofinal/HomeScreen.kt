@@ -22,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,17 +39,21 @@ import com.proyectofinal.data.Item
 import com.proyectofinal.viewmodel.ItemUiState
 import com.proyectofinal.viewmodel.ItemViewModel
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: ItemViewModel,
-    onNoteClick: (Int) -> Unit, // Navegación a la pantalla de edición
-    onAddNewClick: () -> Unit   // Navegación a la pantalla de creación
+    onNoteClick: (Int) -> Unit,   // Navega a la pantalla de edición
+    onAddNewClick: () -> Unit     // Navega a la pantalla de creación (id = 0)
 ) {
+    // Estado global del ViewModel (Loading / Empty / Success / Error)
+
     val uiState by viewModel.uiState.collectAsState()
 
-    // Estado para rastrear el ID del ítem actualmente expandido (null si ninguno)
+    //Estado local: id del ítem que está expandido
     var expandedItemId by rememberSaveable { mutableStateOf<Int?>(null) }
+
 
     MaterialTheme(
         colorScheme = darkColorScheme(),
@@ -75,23 +78,37 @@ fun HomeScreen(
                     .padding(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+
                 Text(
                     text = stringResource(R.string.titulo),
                     style = MaterialTheme.typography.titleLarge,
                     textAlign = TextAlign.Center
                 )
                 Spacer(Modifier.height(8.dp))
+
+
                 SearchBar()
                 Spacer(Modifier.height(16.dp))
 
+
+                // Manejo de los 4 estados del ViewModel
                 when (uiState) {
+                    //Loading
                     is ItemUiState.Loading -> {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
                             CircularProgressIndicator(color = Color.White)
                         }
                     }
+
+                    //Empty
                     is ItemUiState.Empty -> {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
                                 text = stringResource(R.string.nohay),
                                 color = Color.White.copy(alpha = 0.7f),
@@ -99,6 +116,8 @@ fun HomeScreen(
                             )
                         }
                     }
+
+                    //Success
                     is ItemUiState.Success -> {
                         val allItems = (uiState as ItemUiState.Success).items
                         val tasks = allItems.filter { it.isTask }
@@ -108,6 +127,7 @@ fun HomeScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.weight(1f)
                         ) {
+                            //Tareas
                             if (tasks.isNotEmpty()) {
                                 item {
                                     SectionHeader(
@@ -121,7 +141,7 @@ fun HomeScreen(
                                         item = task,
                                         isExpanded = isExpanded,
                                         onExpand = {
-                                            // Cambia el estado: si ya estaba expandido, lo colapsa (null), si no, lo expande
+                                            // Colapsar / expandir
                                             expandedItemId = if (isExpanded) null else task.id
                                         },
                                         onDelete = { viewModel.deleteItem(task) },
@@ -131,6 +151,7 @@ fun HomeScreen(
                                 }
                             }
 
+                            //Notas
                             if (notes.isNotEmpty()) {
                                 item {
                                     SectionHeader(title = stringResource(R.string.notas))
@@ -151,8 +172,13 @@ fun HomeScreen(
                             }
                         }
                     }
+
+                    //Error
                     is ItemUiState.Error -> {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     text = "Error: ${(uiState as ItemUiState.Error).message}",
@@ -172,7 +198,10 @@ fun HomeScreen(
     }
 }
 
-//Envuelve ItemRow y la vista de detalle
+
+/**
+ * Envuelve la fila del ítem y su detalle animado.
+ */
 @Composable
 fun ExpandableItem(
     item: Item,
@@ -185,12 +214,11 @@ fun ExpandableItem(
     Column(modifier = Modifier.fillMaxWidth()) {
         ItemRow(
             item = item,
-            onExpand = onExpand, // Ahora ItemRow toma la acción de expansión
+            onExpand = onExpand,
             onDelete = onDelete,
             onEdit = onEdit,
             onToggleComplete = onToggleComplete
         )
-        // Muestra u oculta el contenido con animación
         AnimatedVisibility(
             visible = isExpanded,
             enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
@@ -201,58 +229,50 @@ fun ExpandableItem(
     }
 }
 
-//La vista que adapta su diseño
+/**
+ * Vista de detalle que se adapta al ancho disponible.
+ */
 @Composable
 fun AdaptiveDetailView(item: Item) {
-    //BoxWithConstraints nos permite conocer el tamaño disponible para el composable
     BoxWithConstraints(
         modifier = Modifier
-            .fillMaxWidth(0.9f) // Usa el mismo ancho que ItemRow
-            .padding(top = 0.dp)
+            .fillMaxWidth(0.9f)
             .background(
-                // Un color de fondo más sutil
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 shape = RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp)
             )
             .padding(16.dp)
     ) {
-        //Se define un punto de corte. 600dp es común para diferenciar teléfonos de tablets.
-        val isLargeScreen = this.maxWidth > 600.dp
+        val isLargeScreen = maxWidth > 600.dp
 
         if (isLargeScreen) {
-            //DISEÑO ADAPTABLE: PANTALLA GRANDE/HORIZONTAL (Row)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
             ) {
-                //Título como encabezado, ocupando un poco menos de la mitad
                 Text(
                     text = item.title,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     modifier = Modifier.weight(0.3f)
                 )
-                Spacer(modifier = Modifier.width(16.dp))
-                //Contenido, ocupando más de la mitad.
+                Spacer(Modifier.width(16.dp))
                 Text(
-                    text = item.description ?: "", // CORRECCIÓN: Manejo de String?
+                    text = item.description ?: "",
                     color = Color.White.copy(alpha = 0.8f),
                     modifier = Modifier.weight(0.7f)
                 )
             }
         } else {
-            // DISEÑO ADAPTABLE: PANTALLA PEQUEÑA/VERTICAL (Column)
             Column(modifier = Modifier.fillMaxWidth()) {
-                // Título
                 Text(
                     text = item.title,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                // Contenido
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    text = item.description ?: "", // CORRECCIÓN: Manejo de String?
+                    text = item.description ?: "",
                     color = Color.White.copy(alpha = 0.8f)
                 )
             }
@@ -260,13 +280,13 @@ fun AdaptiveDetailView(item: Item) {
     }
 }
 
-// ==========================================================
-// COMPONENTE EXISTENTE MODIFICADO: ItemRow
-// ==========================================================
+/**
+ * Fila que muestra el título, checkbox (si es tarea) y botones.
+ */
 @Composable
 fun ItemRow(
     item: Item,
-    onExpand: () -> Unit, // NUEVO: Acción para expandir/colapsar
+    onExpand: () -> Unit,
     onDelete: () -> Unit,
     onEdit: () -> Unit,
     onToggleComplete: () -> Unit
@@ -279,12 +299,12 @@ fun ItemRow(
                 shape = RoundedCornerShape(4.dp)
             )
             .clip(RoundedCornerShape(4.dp))
-            .clickable(onClick = onExpand) // El clic principal es ahora para expandir
+            .clickable(onClick = onExpand)
             .padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Si es una tarea, se muestra el Checkbox para completar.
+        // Checkbox solo para tareas
         if (item.isTask) {
             Checkbox(
                 checked = item.isCompleted,
@@ -296,7 +316,7 @@ fun ItemRow(
                 ),
                 modifier = Modifier.size(24.dp)
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(Modifier.width(8.dp))
         }
 
         Text(
@@ -319,7 +339,6 @@ fun ItemRow(
                     tint = Color.White
                 )
             }
-            // Botón de editar/navegar se mantiene igual
             IconButton(
                 onClick = onEdit,
                 modifier = Modifier.size(28.dp)
@@ -334,12 +353,11 @@ fun ItemRow(
     }
 }
 
-
-// === COMPONENTES AUXILIARES SIN CAMBIOS ===
+//COMPONENTES AUXILIARES
 
 @Composable
 fun SearchBar() {
-    val textState = remember { mutableStateOf("") }
+    val textState = androidx.compose.runtime.remember { mutableStateOf("") }
     OutlinedTextField(
         value = textState.value,
         onValueChange = { textState.value = it },
@@ -372,7 +390,7 @@ fun SectionHeader(title: String, icon: ImageVector? = null) {
                 contentDescription = stringResource(R.string.refrescar),
                 modifier = Modifier
                     .size(22.dp)
-                    .clickable { /* Acción de refrescar (pendiente) */ },
+                    .clickable { /* TODO: refrescar lista */ },
                 tint = Color.White
             )
         }

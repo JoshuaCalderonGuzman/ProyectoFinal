@@ -55,14 +55,6 @@ fun AppNavigation(viewModel: ItemViewModel) {
             // Extrae el itemId de los argumentos, por defecto 0 si no existe
             val itemId = backStackEntry.arguments?.getInt("itemId") ?: 0
 
-            // === CARGA DEL ÍTEM SEGÚN EL MODO ===
-            if (itemId != 0) {
-                // Si el ID es válido, solicita al ViewModel que cargue el ítem para edición
-                viewModel.loadItem(itemId)
-            } else {
-                // Si ID = 0 (nuevo ítem), limpia el estado actual para evitar datos residuales
-                viewModel.clearCurrentItem() // Usa función del ViewModel (reemplaza currentItem = null)
-            }
 
             NotaScreen(
                 itemId = itemId,

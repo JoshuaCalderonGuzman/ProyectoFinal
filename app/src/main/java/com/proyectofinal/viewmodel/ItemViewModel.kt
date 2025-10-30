@@ -17,14 +17,14 @@ sealed class ItemUiState {
     data class Error(val message: String) : ItemUiState()
     object Empty : ItemUiState()
 }
-
+//manejar los estados del viewmodel, inventory
 class ItemViewModel(private val repository: ItemRepository) : ViewModel() {
 
-    // Estado combinado para listas (notas + tareas)
+    // Estado combinado para listas notas + tareas
     private val _uiState = MutableStateFlow<ItemUiState>(ItemUiState.Loading)
     val uiState: StateFlow<ItemUiState> = _uiState.asStateFlow()
 
-    // Estado para el ítem actual (editar/ver detalle)
+    // Estado para el ítem actual editar/ver detalle
     private val _currentItemState = MutableStateFlow<Item?>(null)
     val currentItemState: StateFlow<Item?> = _currentItemState.asStateFlow()
 

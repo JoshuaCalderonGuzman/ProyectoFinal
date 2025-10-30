@@ -17,24 +17,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            // Setup the data/architecture dependencies at the highest level
-            val context = LocalContext.current
-            val database = AppDatabase.getDatabase(context)
+            val database = AppDatabase.getDatabase(LocalContext.current)
             val repository = ItemRepository(database.itemDao())
-            val viewModelFactory = ItemViewModelFactory(repository)
-
-            //Pass the ViewModel to the root of the Navigation Graph
-            AppContent(viewModelFactory)
+            val factory = ItemViewModelFactory(repository)
+            val viewModel = viewModel<ItemViewModel>(factory = factory)
+            AppNavigation(viewModel)
         }
     }
 }
 
-@Composable
-fun AppContent(viewModelFactory: ItemViewModelFactory) {
-    // Obtain the ViewModel instance
-    val viewModel: ItemViewModel = viewModel(factory = viewModelFactory)
-
-    // Setup Navigation (Next step)
-    AppNavigation(viewModel)
-}
 
