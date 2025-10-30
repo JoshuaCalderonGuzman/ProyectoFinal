@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -34,8 +35,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.proyectofinal.R
 import com.proyectofinal.data.Item
+import com.proyectofinal.ui.utils.ContentType
+import com.proyectofinal.ui.utils.NavigationType
 import com.proyectofinal.viewmodel.ItemUiState
 import com.proyectofinal.viewmodel.ItemViewModel
 
@@ -45,12 +47,14 @@ import com.proyectofinal.viewmodel.ItemViewModel
 fun HomeScreen(
     viewModel: ItemViewModel,
     onNoteClick: (Int) -> Unit,   // Navega a la pantalla de edición
-    onAddNewClick: () -> Unit     // Navega a la pantalla de creación (id = 0)
+    onAddNewClick: () -> Unit,     // Navega a la pantalla de creación (id = 0)
+    contentType: ContentType,
+    navigationType: NavigationType
 ) {
     // Estado global del ViewModel (Loading / Empty / Success / Error)
 
     val uiState by viewModel.uiState.collectAsState()
-
+    val currentItem by viewModel.currentItemState.collectAsState()
     //Estado local: id del ítem que está expandido
     var expandedItemId by rememberSaveable { mutableStateOf<Int?>(null) }
 
@@ -61,140 +65,67 @@ fun HomeScreen(
             titleLarge = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
             bodyLarge = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp)
         ),
-        shapes = Shapes(
-            small = RoundedCornerShape(4.dp),
-            medium = RoundedCornerShape(8.dp),
-            large = RoundedCornerShape(12.dp)
-        )
     ) {
-        Scaffold(
-            floatingActionButton = { FloatingAddButton(onAddNewClick) },
-            containerColor = MaterialTheme.colorScheme.background
-        ) { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .fillMaxSize()
-                    .padding(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-
-                Text(
-                    text = stringResource(R.string.titulo),
-                    style = MaterialTheme.typography.titleLarge,
-                    textAlign = TextAlign.Center
+        if (contentType == ContentType.LIST_AND_DETAIL) {
+            // TABLET: Lista + Detalle
+            Row(modifier = Modifier.fillMaxSize()) {
+                // Lista (40%)
+                HomeListContent(
+                    uiState = uiState,
+                    expandedItemId = expandedItemId,
+                    onExpand = { expandedItemId = if (expandedItemId == it) null else it },
+                    onNoteClick = onNoteClick,
+                    onAddNewClick = onAddNewClick,
+                    onDelete = { viewModel.deleteItem(it) },
+                    onToggleComplete = { viewModel.toggleTaskCompletion(it) },
+                    modifier = Modifier.weight(0.4f)
                 )
-                Spacer(Modifier.height(8.dp))
 
-
-                SearchBar()
-                Spacer(Modifier.height(16.dp))
-
-
-                // Manejo de los 4 estados del ViewModel
-                when (uiState) {
-                    //Loading
-                    is ItemUiState.Loading -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(color = Color.White)
-                        }
-                    }
-
-                    //Empty
-                    is ItemUiState.Empty -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = stringResource(R.string.nohay),
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 16.sp
-                            )
-                        }
-                    }
-
-                    //Success
-                    is ItemUiState.Success -> {
-                        val allItems = (uiState as ItemUiState.Success).items
-                        val tasks = allItems.filter { it.isTask }
-                        val notes = allItems.filter { !it.isTask }
-
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            //Tareas
-                            if (tasks.isNotEmpty()) {
-                                item {
-                                    SectionHeader(
-                                        title = stringResource(R.string.tareas),
-                                        icon = Icons.Default.Refresh
-                                    )
-                                }
-                                items(tasks) { task ->
-                                    val isExpanded = expandedItemId == task.id
-                                    ExpandableItem(
-                                        item = task,
-                                        isExpanded = isExpanded,
-                                        onExpand = {
-                                            // Colapsar / expandir
-                                            expandedItemId = if (isExpanded) null else task.id
-                                        },
-                                        onDelete = { viewModel.deleteItem(task) },
-                                        onEdit = { onNoteClick(task.id) },
-                                        onToggleComplete = { viewModel.toggleTaskCompletion(task) }
-                                    )
-                                }
-                            }
-
-                            //Notas
-                            if (notes.isNotEmpty()) {
-                                item {
-                                    SectionHeader(title = stringResource(R.string.notas))
-                                }
-                                items(notes) { note ->
-                                    val isExpanded = expandedItemId == note.id
-                                    ExpandableItem(
-                                        item = note,
-                                        isExpanded = isExpanded,
-                                        onExpand = {
-                                            expandedItemId = if (isExpanded) null else note.id
-                                        },
-                                        onDelete = { viewModel.deleteItem(note) },
-                                        onEdit = { onNoteClick(note.id) },
-                                        onToggleComplete = { /* No action for notes */ }
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    //Error
-                    is ItemUiState.Error -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "Error: ${(uiState as ItemUiState.Error).message}",
-                                    color = Color.Red,
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(Modifier.height(8.dp))
-                                Button(onClick = { viewModel.loadAllItems() }) {
-                                    Text("Reintentar")
-                                }
-                            }
-                        }
-                    }
+                // Detalle (60%)
+                currentItem?.let { item ->
+                    NotaDetailContent(
+                        item = item,
+                        onSave = { updatedItem ->
+                            viewModel.saveItem(updatedItem)
+                        },
+                        onDelete = {
+                            viewModel.deleteItem(item)
+                            viewModel.clearCurrentItem()
+                        },
+                        modifier = Modifier
+                            .weight(0.6f)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.surface)
+                    )
+                } ?: Box(
+                    modifier = Modifier
+                        .weight(0.6f)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.surface),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Selecciona un elemento", color = Color.White.copy(alpha = 0.6f))
                 }
             }
+        }else{
+            Scaffold(
+                floatingActionButton = { FloatingAddButton(onAddNewClick) },
+                containerColor = MaterialTheme.colorScheme.background
+            ) { paddingValues ->
+                HomeListContent(
+                    uiState = uiState,
+                    expandedItemId = expandedItemId,
+                    onExpand = { expandedItemId = if (expandedItemId == it) null else it },
+                    onNoteClick = onNoteClick,
+                    onAddNewClick = onAddNewClick,
+                    onDelete = { viewModel.deleteItem(it) },
+                    onToggleComplete = { viewModel.toggleTaskCompletion(it) },
+                    modifier = Modifier.padding(paddingValues)
+                )
+            }
         }
+
+
     }
 }
 
@@ -390,7 +321,7 @@ fun SectionHeader(title: String, icon: ImageVector? = null) {
                 contentDescription = stringResource(R.string.refrescar),
                 modifier = Modifier
                     .size(22.dp)
-                    .clickable { /* TODO: refrescar lista */ },
+                    .clickable { },
                 tint = Color.White
             )
         }
@@ -407,5 +338,147 @@ fun FloatingAddButton(onClick: () -> Unit) {
         modifier = Modifier.size(60.dp)
     ) {
         Icon(Icons.Default.Add, contentDescription = stringResource(R.string.agregar), tint = Color.Black)
+    }
+}
+
+@Composable
+private fun HomeListContent(
+    uiState: ItemUiState,
+    expandedItemId: Int?,
+    onExpand: (Int) -> Unit,
+    onNoteClick: (Int) -> Unit,
+    onAddNewClick: () -> Unit,
+    onDelete: (Item) -> Unit,
+    onToggleComplete: (Item) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.padding(12.dp)) {
+        Text(
+            text = stringResource(R.string.titulo),
+            style = MaterialTheme.typography.titleLarge,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(8.dp))
+        SearchBar()
+        Spacer(Modifier.height(16.dp))
+
+        when (uiState) {
+            is ItemUiState.Loading -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Color.White)
+                }
+            }
+            is ItemUiState.Empty -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.nohay), color = Color.White.copy(alpha = 0.7f))
+                }
+            }
+            is ItemUiState.Success -> {
+                val tasks = uiState.items.filter { it.isTask }
+                val notes = uiState.items.filter { !it.isTask }
+
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (tasks.isNotEmpty()) {
+                        item { SectionHeader(title = stringResource(R.string.tareas), icon = Icons.Default.Refresh) }
+                        items(tasks) { task ->
+                            ExpandableItem(
+                                item = task,
+                                isExpanded = expandedItemId == task.id,
+                                onExpand = { onExpand(task.id) },
+                                onDelete = { onDelete(task) },
+                                onEdit = { onNoteClick(task.id) },
+                                onToggleComplete = { onToggleComplete(task) }
+                            )
+                        }
+                    }
+                    if (notes.isNotEmpty()) {
+                        item { SectionHeader(title = stringResource(R.string.notas)) }
+                        items(notes) { note ->
+                            ExpandableItem(
+                                item = note,
+                                isExpanded = expandedItemId == note.id,
+                                onExpand = { onExpand(note.id) },
+                                onDelete = { onDelete(note) },
+                                onEdit = { onNoteClick(note.id) },
+                                onToggleComplete = { }
+                            )
+                        }
+                    }
+                }
+            }
+            is ItemUiState.Error -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Error: ${uiState.message}", color = Color.Red)
+                        Spacer(Modifier.height(8.dp))
+                        Button(onClick = { }) { Text("Reintentar") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun NotaDetailContent(
+    item: Item,
+    onSave: (Item) -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var title by remember { mutableStateOf(item.title) }
+    var description by remember { mutableStateOf(item.description ?: "") }
+    var isTask by remember { mutableStateOf(item.isTask) }
+    var isCompleted by remember { mutableStateOf(item.isCompleted) }
+
+    Column(
+        modifier = modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            label = { Text(stringResource(R.string.placeholder_title)) },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(
+            value = description,
+            onValueChange = { description = it },
+            label = { Text(stringResource(R.string.placeholder_description)) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            maxLines = 10
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = isTask, onCheckedChange = { isTask = it })
+            Text(stringResource(R.string.tareas))
+            Spacer(Modifier.width(16.dp))
+            if (isTask) {
+                Checkbox(checked = isCompleted, onCheckedChange = { isCompleted = it })
+                Text(stringResource(R.string.completado))
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = onDelete, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) {
+                Text(stringResource(R.string.eliminar), color = Color.White)
+            }
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = {
+                val updated = item.copy(
+                    title = title,
+                    description = description,
+                    isTask = isTask,
+                    isCompleted = isCompleted && isTask
+                )
+                onSave(updated)
+            }) {
+                Text(stringResource(R.string.guardar))
+            }
+        }
     }
 }

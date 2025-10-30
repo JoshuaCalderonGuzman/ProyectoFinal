@@ -9,6 +9,10 @@ import androidx.navigation.navArgument
 import com.proyectofinal.HomeScreen
 import com.proyectofinal.NotaScreen
 import com.proyectofinal.viewmodel.ItemViewModel
+import com.proyectofinal.ui.utils.ContentType
+import com.proyectofinal.ui.utils.NavigationType
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.runtime.LaunchedEffect
 
 object Routes {
     // La ruta de la pantalla principal
@@ -23,7 +27,10 @@ object Routes {
 }
 
 @Composable
-fun AppNavigation(viewModel: ItemViewModel) {
+fun AppNavigation(viewModel: ItemViewModel,
+                  windowSize: WindowWidthSizeClass,
+                  navigationType: NavigationType,
+                  contentType: ContentType) {
     val navController = rememberNavController() // Controlador de navegación
 
     NavHost(
@@ -34,13 +41,21 @@ fun AppNavigation(viewModel: ItemViewModel) {
         composable(Routes.HOME) {
             HomeScreen(
                 viewModel = viewModel,
+                contentType = contentType,
+                navigationType = navigationType,
                 // Función para navegar a un ítem existente (nota o tarea)
                 onNoteClick = { itemId ->
-                    navController.navigate(Routes.createNotaDetailRoute(itemId))
+                    viewModel.loadItem(itemId)
+                    if (contentType == ContentType.LIST_ONLY) {
+                        navController.navigate(Routes.createNotaDetailRoute(itemId))
+                    }
                 },
                 // Función para navegar y crear un nuevo ítem (se pasa ID = 0)
                 onAddNewClick = {
-                    navController.navigate(Routes.createNotaDetailRoute(0))
+                    viewModel.clearCurrentItem()
+                    if (contentType == ContentType.LIST_ONLY) {
+                        navController.navigate(Routes.createNotaDetailRoute(0))
+                    }
                 }
             )
         }
@@ -54,14 +69,18 @@ fun AppNavigation(viewModel: ItemViewModel) {
 
             // Extrae el itemId de los argumentos, por defecto 0 si no existe
             val itemId = backStackEntry.arguments?.getInt("itemId") ?: 0
+            LaunchedEffect(itemId) {
+                if (itemId > 0) viewModel.loadItem(itemId)
+            }
 
+            if (contentType == ContentType.LIST_ONLY) {
+                NotaScreen(
+                    itemId = itemId,
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
+                )
+            }
 
-            NotaScreen(
-                itemId = itemId,
-                viewModel = viewModel,
-                // Función de regreso: elimina la pantalla actual de la pila de navegación
-                onBack = { navController.popBackStack() }
-            )
         }
     }
 }

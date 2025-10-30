@@ -19,7 +19,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.proyectofinal.R
 import com.proyectofinal.data.Item // Asegúrate de importar Item
 import com.proyectofinal.viewmodel.ItemUiState
 import com.proyectofinal.viewmodel.ItemViewModel // Asegúrate de importar ItemViewModel
@@ -27,22 +26,15 @@ import com.proyectofinal.viewmodel.ItemViewModel // Asegúrate de importar ItemV
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotaScreen(
-    itemId: Int, // ID del item (0 para nuevo)
+
     viewModel: ItemViewModel, // ViewModel inyectado
-    onBack: () -> Unit // Acción de navegación (regreso)
+    onBack: () -> Unit, // Acción de navegación (regreso)
+    isFullScreen: Boolean = true,
+    itemId: Int
 ) {
     // ESTADO DEL ÍTEM ACTUAL
     val uiState by viewModel.uiState.collectAsState()
     val currentItem by viewModel.currentItemState.collectAsState()
-
-    // Cargar el ítem si es edición (itemId != 0)
-    LaunchedEffect(itemId) {
-        if (itemId != 0) {
-            viewModel.loadItem(itemId)
-        } else {
-            viewModel.clearCurrentItem() // Asegurar estado limpio para nuevo
-        }
-    }
 
     //Manejamos estados globales
     when (uiState) {
@@ -88,122 +80,65 @@ fun NotaScreen(
             isCompleted = isTask && isCompleted
         )
         viewModel.saveItem(toSave)
-        onBack()
+        if (isFullScreen) onBack()
     }
 
-    //UI PRINCIPAL
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {},
-                navigationIcon = {
-                    IconButton(onClick = onBack) { // Acción regresar (usa onBack)
-                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.volver))
+    if (isFullScreen) {
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {},
+                    navigationIcon = {
+                        IconButton(onClick = onBack) { // Acción regresar (usa onBack)
+                            Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.volver))
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = saveAndBack) { // Acción guardar
+                            Icon(Icons.Default.Done, contentDescription = stringResource(R.string.guardar))
+                        }
                     }
-                },
-                actions = {
-                    IconButton(onClick = saveAndBack) { // Acción guardar
-                        Icon(Icons.Default.Done, contentDescription = stringResource(R.string.guardar))
-                    }
-                }
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .padding(16.dp)
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.Start
-        ) {
-            // **Caja de Texto: Título**
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text(
-                    text = stringResource(R.string.placeholder_title),
-                    color = LocalContentColor.current.copy(alpha = 0.7f)
-                ) },
-                textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // **Caja de Texto: Descripción**
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = {
-                    Text(
-                        text =stringResource(R.string.placeholder_description),
-                        color = LocalContentColor.current.copy(alpha = 0.7f)
-                    )
-                },
-                textStyle = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f, fill = false),
-                maxLines = 10
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = stringResource(R.string.archivos),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(2) {
-                    ArchivoCard(stringResource(R.string.anotacion))
-                }
-                item {
-                    AddArchivoButton()
-                }
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Checkbox: Es Tarea
-                CircularCheckbox(
-                    text = stringResource(R.string.tarea),
-                    checked = isTask,
-                    onCheckedChange = { isTask = it }
                 )
-
-                // Checkbox: Tarea Completa (solo si es tarea)
-                if (isTask) {
-                    CircularCheckbox(
-                        text = stringResource(R.string.completado),
-                        checked = isCompleted,
-                        onCheckedChange = { isCompleted = it }
-                    )
-                }
-
-                TareaItem(
-                    icon = Icons.Default.Call,
-                    text = stringResource(R.string.audio),
-                    onClick = { /* Acción para Audio */ }
-                )
-
-                TareaItem(
-                    icon = Icons.Default.DateRange,
-                    text = stringResource(R.string.calendario),
-                    onClick = { /* Acción para calendario */ }
-                )
-            }
+            },
+            containerColor = MaterialTheme.colorScheme.background
+        ) { padding ->
+            NotaDetailContent(
+                padding = padding,
+                title = title,
+                onTitleChange = { title = it },
+                description = description,
+                onDescriptionChange = { description = it },
+                isTask = isTask,
+                onTaskChange = { isTask = it },
+                isCompleted = isCompleted,
+                onCompletedChange = { isCompleted = it },
+                onSave = saveAndBack
+            )
         }
+    }else{
+        NotaDetailContent(
+            padding = PaddingValues(0.dp),
+            title = title,
+            onTitleChange = { title = it },
+            description = description,
+            onDescriptionChange = { description = it },
+            isTask = isTask,
+            onTaskChange = { isTask = it },
+            isCompleted = isCompleted,
+            onCompletedChange = { isCompleted = it },
+            onSave = {
+                // Guardamos sin volver (el detalle sigue visible)
+                val toSave = item.copy(
+                    title = title.trim(),
+                    description = description.trim(),
+                    isTask = isTask,
+                    isCompleted = isTask && isCompleted
+                )
+                viewModel.saveItem(toSave)
+            }
+        )
     }
+
 }
 
 // === COMPONENTES AUXILIARES  ===
@@ -305,5 +240,128 @@ fun CircularCheckbox(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onBackground
         )
+    }
+}
+
+@Composable
+private fun NotaDetailContent(
+    padding: PaddingValues,
+    title: String,
+    onTitleChange: (String) -> Unit,
+    description: String,
+    onDescriptionChange: (String) -> Unit,
+    isTask: Boolean,
+    onTaskChange: (Boolean) -> Unit,
+    isCompleted: Boolean,
+    onCompletedChange: (Boolean) -> Unit,
+    onSave: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .padding(padding)
+            .padding(16.dp)
+            .fillMaxSize(),
+        horizontalAlignment = Alignment.Start
+    ) {
+        // **Caja de Texto: Título**
+        OutlinedTextField(
+            value = title,
+            onValueChange = onTitleChange,
+            label = {
+                Text(
+                    text = stringResource(R.string.placeholder_title),
+                    color = LocalContentColor.current.copy(alpha = 0.7f)
+                )
+            },
+            textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // **Caja de Texto: Descripción**
+        OutlinedTextField(
+            value = description,
+            onValueChange = onDescriptionChange,
+            label = {
+                Text(
+                    text = stringResource(R.string.placeholder_description),
+                    color = LocalContentColor.current.copy(alpha = 0.7f)
+                )
+            },
+            textStyle = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false),
+            maxLines = 10
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = stringResource(R.string.archivos),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(2) {
+                ArchivoCard(stringResource(R.string.anotacion))
+            }
+            item {
+                AddArchivoButton()
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Checkbox: Es Tarea
+            CircularCheckbox(
+                text = stringResource(R.string.tarea),
+                checked = isTask,
+                onCheckedChange = onTaskChange
+            )
+
+            // Checkbox: Tarea Completa (solo si es tarea)
+            if (isTask) {
+                CircularCheckbox(
+                    text = stringResource(R.string.completado),
+                    checked = isCompleted,
+                    onCheckedChange = onCompletedChange
+                )
+            }
+
+            TareaItem(
+                icon = Icons.Default.Call,
+                text = stringResource(R.string.audio),
+                onClick = { /* Acción para Audio */ }
+            )
+
+            TareaItem(
+                icon = Icons.Default.DateRange,
+                text = stringResource(R.string.calendario),
+                onClick = { /* Acción para calendario */ }
+            )
+        }
+
+        // Botón de guardar (solo visible en modo tablet, ya que en teléfono está en la TopBar)
+        if (!padding.calculateTopPadding().value.isNaN() && padding.calculateTopPadding() == 0.dp) {
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = onSave,
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Icon(Icons.Default.Done, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.guardar))
+            }
+        }
     }
 }
