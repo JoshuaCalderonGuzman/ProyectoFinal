@@ -4,10 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.proyectofinal.data.Item
-import com.proyectofinal.data.ItemRepository
+import com.proyectofinal.data.ItemsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 //Sealed class para representar los estados de la UI
@@ -18,7 +19,7 @@ sealed class ItemUiState {
     object Empty : ItemUiState()
 }
 //manejar los estados del viewmodel, inventory
-class ItemViewModel(private val repository: ItemRepository) : ViewModel() {
+class ItemViewModel(private val repository: ItemsRepository) : ViewModel() {
 
     // Estado combinado para listas notas + tareas
     private val _uiState = MutableStateFlow<ItemUiState>(ItemUiState.Loading)
@@ -36,14 +37,16 @@ class ItemViewModel(private val repository: ItemRepository) : ViewModel() {
     fun loadAllItems() {
         viewModelScope.launch {
             try {
-                repository.allNotes.collect { notes ->
-                    repository.allTasks.collect { tasks ->
-                        val allItems = notes + tasks
-                        _uiState.value = if (allItems.isEmpty()) {
-                            ItemUiState.Empty
-                        } else {
-                            ItemUiState.Success(allItems)
-                        }
+                combine(
+                    repository.getAllNotes(),
+                    repository.getAllTasks()
+                ) { notes, tasks ->
+                    notes + tasks
+                }.collect { allItems ->
+                    _uiState.value = if (allItems.isEmpty()) {
+                        ItemUiState.Empty
+                    } else {
+                        ItemUiState.Success(allItems)
                     }
                 }
             } catch (e: Exception) {
@@ -102,10 +105,13 @@ class ItemViewModel(private val repository: ItemRepository) : ViewModel() {
     fun toggleTaskCompletion(task: Item) {
         viewModelScope.launch {
             try {
-                repository.toggleTaskCompletion(task)
-                loadAllItems() // Refrescar estado
+                if (task.isTask) {
+                    val updatedTask = task.copy(isCompleted = !task.isCompleted)
+                    repository.update(updatedTask) // Usa update() directamente
+                }
+                loadAllItems() // Refresca lista
             } catch (e: Exception) {
-                _uiState.value = ItemUiState.Error("Error al actualizar tarea")
+                _uiState.value = ItemUiState.Error("Error al actualizar tarea: ${e.message}")
             }
         }
     }
@@ -117,7 +123,7 @@ class ItemViewModel(private val repository: ItemRepository) : ViewModel() {
 }
 
 // Factory
-class ItemViewModelFactory(private val repository: ItemRepository) : ViewModelProvider.Factory {
+class ItemViewModelFactory(private val repository: ItemsRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ItemViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
