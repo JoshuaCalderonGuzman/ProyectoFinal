@@ -19,24 +19,30 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.proyectofinal.data.Item // Asegúrate de importar Item
+import com.proyectofinal.data.Item
 import com.proyectofinal.viewmodel.ItemUiState
-import com.proyectofinal.viewmodel.ItemViewModel // Asegúrate de importar ItemViewModel
+import com.proyectofinal.viewmodel.ItemViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotaScreen(
-
     viewModel: ItemViewModel, // ViewModel inyectado
     onBack: () -> Unit, // Acción de navegación (regreso)
     isFullScreen: Boolean = true,
     itemId: Int
 ) {
-    // ESTADO DEL ÍTEM ACTUAL
+    // ESTADO GLOBAL DEL VIEWMODEL
     val uiState by viewModel.uiState.collectAsState()
     val currentItem by viewModel.currentItemState.collectAsState()
 
-    //Manejamos estados globales
+    // === ESTADOS DE EDICIÓN DESDE EL VIEWMODEL ===
+    val title by viewModel.title.collectAsState()
+    val description by viewModel.description.collectAsState()
+    val isTask by viewModel.isTask.collectAsState()
+    val isCompleted by viewModel.isCompleted.collectAsState()
+    // =============================================
+
+    // Manejamos estados globales de carga/error
     when (uiState) {
         is ItemUiState.Loading -> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -50,7 +56,7 @@ fun NotaScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Error: $msg", color = Color.Red)
                     Spacer(Modifier.height(8.dp))
-                    Button(onClick = { viewModel.loadAllItems()}) {
+                    Button(onClick = { viewModel.loadAllItems() }) {
                         Text("Reintentar")
                     }
                 }
@@ -60,26 +66,22 @@ fun NotaScreen(
         else -> Unit
     }
 
+    // Objeto base para saber el ID (si es 0 es nuevo)
+    val itemBase = currentItem ?: Item(id = 0, title = "", description = "", isTask = false, isCompleted = false)
 
-    //  Ítem actual
-    val item = currentItem ?: Item(id = 0, title = "", description = "", isTask = false, isCompleted = false)
-
-    // Estado local solo para edición
-    var title by remember(item) { mutableStateOf(item.title) }
-    var description by remember(item) { mutableStateOf(item.description ?: "") }
-    var isTask by remember(item) { mutableStateOf(item.isTask) }
-    var isCompleted by remember(item) { mutableStateOf(item.isCompleted) }
-
-
-    //Guardar
-    val saveAndBack = {
-        val toSave = item.copy(
+    // Función para Guardar
+    val saveAction = {
+        val toSave = itemBase.copy(
             title = title.trim(),
             description = description.trim(),
             isTask = isTask,
-            isCompleted = isTask && isCompleted
+            isCompleted = isTask && isCompleted // Solo completado si es tarea
         )
         viewModel.saveItem(toSave)
+    }
+
+    val saveAndBack = {
+        saveAction()
         if (isFullScreen) onBack()
     }
 
@@ -89,12 +91,12 @@ fun NotaScreen(
                 CenterAlignedTopAppBar(
                     title = {},
                     navigationIcon = {
-                        IconButton(onClick = onBack) { // Acción regresar (usa onBack)
+                        IconButton(onClick = onBack) {
                             Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.volver))
                         }
                     },
                     actions = {
-                        IconButton(onClick = saveAndBack) { // Acción guardar
+                        IconButton(onClick = saveAndBack) {
                             Icon(Icons.Default.Done, contentDescription = stringResource(R.string.guardar))
                         }
                     }
@@ -105,43 +107,36 @@ fun NotaScreen(
             NotaDetailContent(
                 padding = padding,
                 title = title,
-                onTitleChange = { title = it },
+                onTitleChange = { viewModel.updateTitle(it) },
                 description = description,
-                onDescriptionChange = { description = it },
+                onDescriptionChange = { viewModel.updateDescription(it) },
                 isTask = isTask,
-                onTaskChange = { isTask = it },
+                onTaskChange = { viewModel.updateIsTask(it) },
                 isCompleted = isCompleted,
-                onCompletedChange = { isCompleted = it },
+                onCompletedChange = { viewModel.updateIsCompleted(it) },
                 onSave = saveAndBack
             )
         }
-    }else{
+    } else {
         NotaDetailContent(
             padding = PaddingValues(0.dp),
             title = title,
-            onTitleChange = { title = it },
+            onTitleChange = { viewModel.updateTitle(it) },
             description = description,
-            onDescriptionChange = { description = it },
+            onDescriptionChange = { viewModel.updateDescription(it) },
             isTask = isTask,
-            onTaskChange = { isTask = it },
+            onTaskChange = { viewModel.updateIsTask(it) },
             isCompleted = isCompleted,
-            onCompletedChange = { isCompleted = it },
+            onCompletedChange = { viewModel.updateIsCompleted(it) },
             onSave = {
                 // Guardamos sin volver (el detalle sigue visible)
-                val toSave = item.copy(
-                    title = title.trim(),
-                    description = description.trim(),
-                    isTask = isTask,
-                    isCompleted = isTask && isCompleted
-                )
-                viewModel.saveItem(toSave)
+                saveAction()
             }
         )
     }
-
 }
 
-// === COMPONENTES AUXILIARES  ===
+// === COMPONENTES AUXILIARES (Sin Cambios) ===
 
 @Composable
 fun ArchivoCard(nombre: String) {
@@ -351,7 +346,7 @@ private fun NotaDetailContent(
             )
         }
 
-        // Botón de guardar (solo visible en modo tablet, ya que en teléfono está en la TopBar)
+        // Botón de guardar (solo visible si no hay TopBar, e.g. tablet mode o landscape sin scaffold topbar)
         if (!padding.calculateTopPadding().value.isNaN() && padding.calculateTopPadding() == 0.dp) {
             Spacer(Modifier.height(16.dp))
             Button(

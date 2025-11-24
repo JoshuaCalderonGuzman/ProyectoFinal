@@ -18,6 +18,7 @@ sealed class ItemUiState {
     data class Error(val message: String) : ItemUiState()
     object Empty : ItemUiState()
 }
+
 //manejar los estados del viewmodel, inventory
 class ItemViewModel(private val repository: ItemsRepository) : ViewModel() {
 
@@ -25,9 +26,23 @@ class ItemViewModel(private val repository: ItemsRepository) : ViewModel() {
     private val _uiState = MutableStateFlow<ItemUiState>(ItemUiState.Loading)
     val uiState: StateFlow<ItemUiState> = _uiState.asStateFlow()
 
-    // Estado para el ítem actual editar/ver detalle
+    // Estado para el ítem actual (base de datos)
     private val _currentItemState = MutableStateFlow<Item?>(null)
     val currentItemState: StateFlow<Item?> = _currentItemState.asStateFlow()
+
+    // === NUEVOS ESTADOS PARA EDICIÓN (Formulario) ===
+    private val _title = MutableStateFlow("")
+    val title: StateFlow<String> = _title.asStateFlow()
+
+    private val _description = MutableStateFlow("")
+    val description: StateFlow<String> = _description.asStateFlow()
+
+    private val _isTask = MutableStateFlow(false)
+    val isTask: StateFlow<Boolean> = _isTask.asStateFlow()
+
+    private val _isCompleted = MutableStateFlow(false)
+    val isCompleted: StateFlow<Boolean> = _isCompleted.asStateFlow()
+    // ================================================
 
     // Cargar todas las notas y tareas
     init {
@@ -61,7 +76,8 @@ class ItemViewModel(private val repository: ItemsRepository) : ViewModel() {
                 val item = repository.getItemById(itemId)
                 if (item != null) {
                     _currentItemState.value = item
-
+                    // Actualizamos los estados del formulario con los datos cargados
+                    updateFormState(item)
                 } else {
                     _uiState.value = ItemUiState.Error("Elemento no encontrado")
                 }
@@ -69,6 +85,20 @@ class ItemViewModel(private val repository: ItemsRepository) : ViewModel() {
                 _uiState.value = ItemUiState.Error(e.message ?: "Error al cargar")
             }
         }
+    }
+
+    // Métodos para actualizar los campos desde la UI
+    fun updateTitle(newTitle: String) { _title.value = newTitle }
+    fun updateDescription(newDesc: String) { _description.value = newDesc }
+    fun updateIsTask(isTask: Boolean) { _isTask.value = isTask }
+    fun updateIsCompleted(completed: Boolean) { _isCompleted.value = completed }
+
+    // Helper interno para sincronizar formulario
+    private fun updateFormState(item: Item) {
+        _title.value = item.title
+        _description.value = item.description ?: ""
+        _isTask.value = item.isTask
+        _isCompleted.value = item.isCompleted
     }
 
     fun saveItem(item: Item) {
@@ -81,7 +111,7 @@ class ItemViewModel(private val repository: ItemsRepository) : ViewModel() {
                 }
                 // Recargar lista después de guardar
                 loadAllItems()
-                _currentItemState.value = null // Limpiar detalle
+                clearCurrentItem() // Limpiar detalle
             } catch (e: Exception) {
                 _uiState.value = ItemUiState.Error("Error al guardar: ${e.message}")
             }
@@ -94,7 +124,7 @@ class ItemViewModel(private val repository: ItemsRepository) : ViewModel() {
                 repository.delete(item)
                 loadAllItems() // Actualizar lista
                 if (_currentItemState.value?.id == item.id) {
-                    _currentItemState.value = null
+                    clearCurrentItem()
                 }
             } catch (e: Exception) {
                 _uiState.value = ItemUiState.Error("Error al eliminar: ${e.message}")
@@ -116,9 +146,13 @@ class ItemViewModel(private val repository: ItemsRepository) : ViewModel() {
         }
     }
 
-    // Limpiar estado de ítem actual
+    // Limpiar estado de ítem actual y formulario
     fun clearCurrentItem() {
         _currentItemState.value = null
+        _title.value = ""
+        _description.value = ""
+        _isTask.value = false
+        _isCompleted.value = false
     }
 }
 
