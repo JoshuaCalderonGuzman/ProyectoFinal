@@ -1,15 +1,12 @@
 package com.proyectofinal
 
-
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.proyectofinal.data.AppDatabase
-import com.proyectofinal.data.ItemsRepository
-import com.proyectofinal.navigation.AppNavigation // New
+import com.proyectofinal.navigation.AppNavigation
 import com.proyectofinal.viewmodel.ItemViewModel
 import com.proyectofinal.viewmodel.ItemViewModelFactory
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
@@ -17,11 +14,27 @@ import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import com.proyectofinal.ui.utils.ContentType
 import com.proyectofinal.ui.utils.NavigationType
+import android.app.Application // Asegurarse de importar Application
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
 
 class MainActivity : ComponentActivity() {
+
+    // 1. Crear el lanzador de permisos (Debe estar fuera de onCreate/setContent)
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        // Aquí puedes poner lógica de seguimiento si el permiso fue concedido o denegado
+    }
+
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 2. Solicitar el permiso de notificación al iniciar la Activity
+        requestNotificationPermission()
 
         setContent {
             val windowSizeClass = calculateWindowSizeClass(this)
@@ -39,13 +52,15 @@ class MainActivity : ComponentActivity() {
             } else {
                 ContentType.LIST_ONLY
             }
+
             // Obtiene la aplicación personalizada
             val application = LocalContext.current.applicationContext as InventoryApplication
             val repository = application.container.itemsRepository
 
-            // Factory con el repositorio inyectado
+            // Factory con el repositorio y el objeto application inyectados
             val viewModel: ItemViewModel = viewModel(
-                factory = ItemViewModelFactory(repository)
+                // ⬇️ CORRECCIÓN del error 'No value passed for parameter application' ⬇️
+                factory = ItemViewModelFactory(repository, application)
             )
 
             AppNavigation(viewModel = viewModel,windowSize = widthSize,
@@ -53,6 +68,13 @@ class MainActivity : ComponentActivity() {
                 contentType = contentType)
         }
     }
+
+    // 3. Función para solicitar el permiso de notificaciones (Android 13+)
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // TIRAMISU = Android 13 (API 33)
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
 }
-
-

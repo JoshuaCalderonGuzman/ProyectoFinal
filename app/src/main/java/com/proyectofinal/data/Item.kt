@@ -10,5 +10,7 @@ data class Item(
     val description: String? = null,
     val isTask: Boolean = false,
     val isCompleted: Boolean = false,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    // ⬇️ DEBES AGREGAR ESTE CAMPO PARA LA FECHA LÍMITE ⬇️
+    val dueDateTimestamp: Long? = null
 )

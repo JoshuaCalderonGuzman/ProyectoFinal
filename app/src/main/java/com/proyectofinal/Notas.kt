@@ -16,12 +16,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext // Necesario para el contexto de los Date/Time Pickers
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.proyectofinal.data.Item
 import com.proyectofinal.viewmodel.ItemUiState
 import com.proyectofinal.viewmodel.ItemViewModel
+import java.util.Calendar // Necesario para manejar fechas
+import android.app.DatePickerDialog // Necesario para DatePicker
+import android.app.TimePickerDialog // Necesario para TimePicker
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,6 +44,8 @@ fun NotaScreen(
     val description by viewModel.description.collectAsState()
     val isTask by viewModel.isTask.collectAsState()
     val isCompleted by viewModel.isCompleted.collectAsState()
+    // ⬇️ NUEVO: Estado para la Fecha Límite desde el ViewModel ⬇️
+    val dueDateTimestamp by viewModel.dueDate.collectAsState()
     // =============================================
 
     // Manejamos estados globales de carga/error
@@ -67,7 +73,8 @@ fun NotaScreen(
     }
 
     // Objeto base para saber el ID (si es 0 es nuevo)
-    val itemBase = currentItem ?: Item(id = 0, title = "", description = "", isTask = false, isCompleted = false)
+    // ⚠️ ATENCIÓN: Se asume que Item tiene un campo Long? llamado `dueDateTimestamp`
+    val itemBase = currentItem ?: Item(id = 0, title = "", description = "", isTask = false, isCompleted = false /*, dueDateTimestamp = null*/)
 
     // Función para Guardar
     val saveAction = {
@@ -75,7 +82,9 @@ fun NotaScreen(
             title = title.trim(),
             description = description.trim(),
             isTask = isTask,
-            isCompleted = isTask && isCompleted // Solo completado si es tarea
+            isCompleted = isTask && isCompleted, // Solo completado si es tarea
+            // ⬇️ NUEVO: Guardar el timestamp de la fecha límite ⬇️
+            dueDateTimestamp = dueDateTimestamp
         )
         viewModel.saveItem(toSave)
     }
@@ -84,6 +93,62 @@ fun NotaScreen(
         saveAction()
         if (isFullScreen) onBack()
     }
+
+    // ⬇️ LÓGICA DEL DATE/TIME PICKER ⬇️
+    val context = LocalContext.current
+    val showTimePicker = remember { mutableStateOf(false) }
+
+    val onDateSelected: (year: Int, month: Int, day: Int) -> Unit = { year, month, day ->
+        val calendar = Calendar.getInstance()
+        calendar.set(year, month, day, 0, 0, 0) // Inicializa la hora
+        viewModel.updateDueDate(calendar.timeInMillis)
+        showTimePicker.value = true // Mostrar el selector de hora después de la fecha
+    }
+
+    val onTimeSelected: (hour: Int, minute: Int) -> Unit = { hour, minute ->
+        // Si ya hay una fecha seleccionada, la actualiza con la hora
+        dueDateTimestamp?.let { currentTimestamp ->
+            val calendar = Calendar.getInstance().apply { timeInMillis = currentTimestamp }
+            calendar.set(Calendar.HOUR_OF_DAY, hour)
+            calendar.set(Calendar.MINUTE, minute)
+            calendar.set(Calendar.SECOND, 0)
+            viewModel.updateDueDate(calendar.timeInMillis)
+        }
+    }
+
+    val onCalendarClick = {
+        if (isTask) {
+            val calendar = Calendar.getInstance()
+            // Usa la fecha actual o la guardada
+            dueDateTimestamp?.let { calendar.timeInMillis = it }
+
+            DatePickerDialog(
+                context,
+                { _, year, month, day -> onDateSelected(year, month, day) },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)
+            ).show()
+        }
+        // No hace nada si no es tarea, para mantener el requisito de no cambiar funcionalidad
+    }
+
+    if (showTimePicker.value) {
+        val calendar = Calendar.getInstance()
+        dueDateTimestamp?.let { calendar.timeInMillis = it }
+
+        TimePickerDialog(
+            context,
+            { _, hour, minute ->
+                onTimeSelected(hour, minute)
+                showTimePicker.value = false // Cerrar el selector de hora
+            },
+            calendar.get(Calendar.HOUR_OF_DAY),
+            calendar.get(Calendar.MINUTE),
+            true // formato 24 horas
+        ).show()
+    }
+    // ⬆️ FIN LÓGICA DEL DATE/TIME PICKER ⬆️
 
     if (isFullScreen) {
         Scaffold(
@@ -114,6 +179,8 @@ fun NotaScreen(
                 onTaskChange = { viewModel.updateIsTask(it) },
                 isCompleted = isCompleted,
                 onCompletedChange = { viewModel.updateIsCompleted(it) },
+                // ⬇️ NUEVO: Pasar el callback para el botón de calendario ⬇️
+                onCalendarClick = onCalendarClick,
                 onSave = saveAndBack
             )
         }
@@ -128,6 +195,8 @@ fun NotaScreen(
             onTaskChange = { viewModel.updateIsTask(it) },
             isCompleted = isCompleted,
             onCompletedChange = { viewModel.updateIsCompleted(it) },
+            // ⬇️ NUEVO: Pasar el callback para el botón de calendario ⬇️
+            onCalendarClick = onCalendarClick,
             onSave = {
                 // Guardamos sin volver (el detalle sigue visible)
                 saveAction()
@@ -249,6 +318,8 @@ private fun NotaDetailContent(
     onTaskChange: (Boolean) -> Unit,
     isCompleted: Boolean,
     onCompletedChange: (Boolean) -> Unit,
+    // ⬇️ NUEVO: Callback para el botón de calendario ⬇️
+    onCalendarClick: () -> Unit,
     onSave: () -> Unit
 ) {
     Column(
@@ -342,7 +413,8 @@ private fun NotaDetailContent(
             TareaItem(
                 icon = Icons.Default.DateRange,
                 text = stringResource(R.string.calendario),
-                onClick = { /* Acción para calendario */ }
+                // ⬇️ MODIFICADO: Llamada al nuevo callback ⬇️
+                onClick = onCalendarClick
             )
         }
 

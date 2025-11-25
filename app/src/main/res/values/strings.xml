@@ -1,5 +1,4 @@
 <resources>
-    <!-- HomeScreen -->
     <string name="app_name" translatable="false">Proyecto Final</string>
     <string name="notas">Notas</string>
     <string name="titulo">HOME</string>
@@ -11,7 +10,6 @@
     <string name="refrescar">Refrescar</string>
 
     <string name="nohay">No hay tareas ni notas</string>
-    <!-- Notas -->
     <string name="volver">Volver</string>
     <string name="guardar">Guardar</string>
     <string name="placeholder_title">Escriba el título aquí...</string>
@@ -24,5 +22,14 @@
     <string name="audio">Audio</string>
     <string name="calendario">Calendario</string>
     <string name="seleccionado">Seleccionado</string>
+
+    <string name="canal_recordatorios">Recordatorios de Tareas</string>
+    <string name="descripcion_canal_recordatorios">Muestra notificaciones para recordatorios de tareas con fecha límite.</string>
+    <string name="recordatorio_tarea">Recordatorio de Tarea</string>
+    <string name="tienes_una_tarea_pendiente">Tienes una tarea pendiente.</string>
+
+    <string name="fecha_limite">Fecha Límite</string>
+    <string name="fecha_hora_formato" translatable="false">%1$s a las %2$s</string>
+    <string name="sin_fecha">Sin fecha límite</string>
 
 </resources>
