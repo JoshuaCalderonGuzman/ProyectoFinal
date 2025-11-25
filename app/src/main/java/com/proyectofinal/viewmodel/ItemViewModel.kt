@@ -44,6 +44,7 @@ class ItemViewModel(private val repository: ItemsRepository) : ViewModel() {
     val isCompleted: StateFlow<Boolean> = _isCompleted.asStateFlow()
     // ================================================
 
+
     // Cargar todas las notas y tareas
     init {
         loadAllItems()
@@ -92,6 +93,19 @@ class ItemViewModel(private val repository: ItemsRepository) : ViewModel() {
     fun updateDescription(newDesc: String) { _description.value = newDesc }
     fun updateIsTask(isTask: Boolean) { _isTask.value = isTask }
     fun updateIsCompleted(completed: Boolean) { _isCompleted.value = completed }
+
+    fun startNewItemCreation() {
+        // Creamos un nuevo Item con ID 0, que es la señal para 'insertar' en saveItem()
+        val newItem = Item(
+            id = 0,
+            title = "",
+            description = null,
+            isTask = false,
+            isCompleted = false
+        )
+        _currentItemState.value = newItem
+        updateFormState(newItem) // Sincronizamos el formulario con los valores vacíos
+    }
 
     // Helper interno para sincronizar formulario
     private fun updateFormState(item: Item) {
@@ -155,6 +169,8 @@ class ItemViewModel(private val repository: ItemsRepository) : ViewModel() {
         _isCompleted.value = false
     }
 }
+
+
 
 // Factory
 class ItemViewModelFactory(private val repository: ItemsRepository) : ViewModelProvider.Factory {

@@ -58,6 +58,21 @@ fun HomeScreen(
     //Estado local: id del ítem que está expandido
     var expandedItemId by rememberSaveable { mutableStateOf<Int?>(null) }
 
+    val onAddAction: () -> Unit = {
+        if (contentType == ContentType.LIST_AND_DETAIL) {
+            // Caso Tablet: Inicia la creación en el panel de detalle
+            viewModel.startNewItemCreation() //
+        } else {
+            // Caso Móvil: Navega a la pantalla completa de creación
+            onAddNewClick()
+        }
+    }
+
+    val listHeaderColor = if (contentType == ContentType.LIST_AND_DETAIL) {
+        Color.Black // Modo Tablet: Fondo del 40% es blanco, Texto debe ser NEGRO.
+    } else {
+        Color.White // Modo Móvil: Fondo es oscuro (del darkColorScheme), Texto debe ser BLANCO.
+    }
 
     MaterialTheme(
         colorScheme = darkColorScheme(),
@@ -70,16 +85,30 @@ fun HomeScreen(
             // TABLET: Lista + Detalle
             Row(modifier = Modifier.fillMaxSize()) {
                 // Lista (40%)
-                HomeListContent(
-                    uiState = uiState,
-                    expandedItemId = expandedItemId,
-                    onExpand = { expandedItemId = if (expandedItemId == it) null else it },
-                    onNoteClick = onNoteClick,
-                    onAddNewClick = onAddNewClick,
-                    onDelete = { viewModel.deleteItem(it) },
-                    onToggleComplete = { viewModel.toggleTaskCompletion(it) },
-                    modifier = Modifier.weight(0.4f)
-                )
+                Box(modifier = Modifier.weight(0.4f).fillMaxHeight().background(Color.White)){
+                    HomeListContent(
+                        uiState = uiState,
+                        expandedItemId = expandedItemId,
+                        onExpand = { expandedItemId = if (expandedItemId == it) null else it },
+                        onNoteClick = onNoteClick,
+                        onAddNewClick = onAddAction,
+                        onDelete = { viewModel.deleteItem(it) },
+                        onToggleComplete = { viewModel.toggleTaskCompletion(it) },
+                        headerColor = listHeaderColor,
+                        modifier = Modifier.fillMaxSize()
+
+                    )
+                    // Botón Flotante colocado DENTRO del Box (40%)
+                    FloatingAddButton(
+                        onClick = onAddAction,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(16.dp)
+
+                    )
+
+                }
+
 
                 // Detalle (60%)
                 currentItem?.let { item ->
@@ -109,7 +138,7 @@ fun HomeScreen(
             }
         }else{
             Scaffold(
-                floatingActionButton = { FloatingAddButton(onAddNewClick) },
+                floatingActionButton = { FloatingAddButton(onAddAction) },
                 containerColor = MaterialTheme.colorScheme.background
             ) { paddingValues ->
                 HomeListContent(
@@ -117,9 +146,10 @@ fun HomeScreen(
                     expandedItemId = expandedItemId,
                     onExpand = { expandedItemId = if (expandedItemId == it) null else it },
                     onNoteClick = onNoteClick,
-                    onAddNewClick = onAddNewClick,
+                    onAddNewClick = onAddAction,
                     onDelete = { viewModel.deleteItem(it) },
                     onToggleComplete = { viewModel.toggleTaskCompletion(it) },
+                    headerColor = listHeaderColor,
                     modifier = Modifier.padding(paddingValues)
                 )
             }
@@ -306,7 +336,8 @@ fun SearchBar() {
 }
 
 @Composable
-fun SectionHeader(title: String, icon: ImageVector? = null) {
+fun SectionHeader(title: String, icon: ImageVector? = null, headerColor: Color) {
+
     Row(
         modifier = Modifier
             .fillMaxWidth(0.9f)
@@ -314,7 +345,8 @@ fun SectionHeader(title: String, icon: ImageVector? = null) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = Color.White)
+
+        Text(title, style = MaterialTheme.typography.titleMedium, color = headerColor)
         if (icon != null) {
             Icon(
                 imageVector = icon,
@@ -322,20 +354,20 @@ fun SectionHeader(title: String, icon: ImageVector? = null) {
                 modifier = Modifier
                     .size(22.dp)
                     .clickable { },
-                tint = Color.White
+                tint = headerColor
             )
         }
     }
 }
 
 @Composable
-fun FloatingAddButton(onClick: () -> Unit) {
+fun FloatingAddButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     FloatingActionButton(
         onClick = onClick,
         shape = CircleShape,
         containerColor = Color.White,
         contentColor = Color.Black,
-        modifier = Modifier.size(60.dp)
+        modifier = modifier.size(60.dp)
     ) {
         Icon(Icons.Default.Add, contentDescription = stringResource(R.string.agregar), tint = Color.Black)
     }
@@ -350,7 +382,8 @@ private fun HomeListContent(
     onAddNewClick: () -> Unit,
     onDelete: (Item) -> Unit,
     onToggleComplete: (Item) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    headerColor: Color
 ) {
     Column(modifier = modifier.padding(12.dp)) {
         Text(
@@ -380,7 +413,7 @@ private fun HomeListContent(
 
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (tasks.isNotEmpty()) {
-                        item { SectionHeader(title = stringResource(R.string.tareas), icon = Icons.Default.Refresh) }
+                        item { SectionHeader(title = stringResource(R.string.tareas), icon = Icons.Default.Refresh,headerColor = headerColor) }
                         items(tasks) { task ->
                             ExpandableItem(
                                 item = task,
@@ -393,7 +426,7 @@ private fun HomeListContent(
                         }
                     }
                     if (notes.isNotEmpty()) {
-                        item { SectionHeader(title = stringResource(R.string.notas)) }
+                        item { SectionHeader(title = stringResource(R.string.notas),headerColor = headerColor) }
                         items(notes) { note ->
                             ExpandableItem(
                                 item = note,
@@ -455,11 +488,13 @@ fun NotaDetailContent(
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = isTask, onCheckedChange = { isTask = it })
-            Text(stringResource(R.string.tareas))
+            Text(stringResource(R.string.tarea),
+                        color = Color.White)
             Spacer(Modifier.width(16.dp))
             if (isTask) {
                 Checkbox(checked = isCompleted, onCheckedChange = { isCompleted = it })
-                Text(stringResource(R.string.completado))
+                Text(stringResource(R.string.completado),
+                            color = Color.White)
             }
         }
         Spacer(Modifier.height(16.dp))
