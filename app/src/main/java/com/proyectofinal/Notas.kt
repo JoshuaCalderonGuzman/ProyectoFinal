@@ -26,6 +26,8 @@ import com.proyectofinal.viewmodel.ItemViewModel
 import java.util.Calendar // Necesario para manejar fechas
 import android.app.DatePickerDialog // Necesario para DatePicker
 import android.app.TimePickerDialog // Necesario para TimePicker
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material.ripple.rememberRipple
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -372,14 +374,79 @@ private fun NotaDetailContent(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.archivos),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        var showMediaMenu by remember { mutableStateOf(false) }
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             items(2) {
-                ArchivoCard(stringResource(R.string.anotacion))
+                ArchivoCard(nombre = stringResource(R.string.anotacion))
             }
+
             item {
-                AddArchivoButton()
+                Box(
+                    modifier = Modifier
+                        .size(76.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        // Ripple moderno de Material3 (sin deprecaciones)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(
+                                bounded = false,           // ripple circular que sale del centro
+                                radius = 38.dp             // tamaño perfecto para tu botón de 76.dp
+                            ),
+                            onClick = { showMediaMenu = true }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Add,
+                        contentDescription = "Añadir multimedia",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(36.dp)
+                    )
+
+                    DropdownMenu(
+                        expanded = showMediaMenu,
+                        onDismissRequest = { showMediaMenu = false },
+                        modifier = Modifier
+                            .width(240.dp)
+                            .background(MaterialTheme.colorScheme.surface)
+                    ) {
+                        DropdownMenuItem(
+                            text = { MenuItemText(Icons.Default.PhotoLibrary, "Galería") },
+                            onClick = { showMediaMenu = false }
+                        )
+                        DropdownMenuItem(
+                            text = { MenuItemText(Icons.Default.PhotoCamera, "Tomar foto") },
+                            onClick = { showMediaMenu = false }
+                        )
+                        DropdownMenuItem(
+                            text = { MenuItemText(Icons.Default.Videocam, "Grabar vídeo") },
+                            onClick = { showMediaMenu = false }
+                        )
+                        DropdownMenuItem(
+                            text = { MenuItemText(Icons.Default.Mic, "Grabar audio") },
+                            onClick = { showMediaMenu = false }
+                        )
+                        DropdownMenuItem(
+                            text = { MenuItemText(Icons.Default.AttachFile, "Archivo") },
+                            onClick = { showMediaMenu = false }
+                        )
+                    }
+                }
             }
         }
+
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -430,5 +497,26 @@ private fun NotaDetailContent(
                 Text(stringResource(R.string.guardar))
             }
         }
+    }
+}
+
+@Composable
+private fun MenuItemText(icon: ImageVector, text: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 8.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
