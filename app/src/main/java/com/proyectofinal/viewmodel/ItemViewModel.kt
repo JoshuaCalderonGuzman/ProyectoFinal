@@ -6,6 +6,7 @@ import android.app.Application
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -57,8 +58,19 @@ class ItemViewModel(
     // NUEVO ESTADO: Fecha Límite (timestamp en milisegundos)
     private val _dueDate = MutableStateFlow<Long?>(null)
     val dueDate: StateFlow<Long?> = _dueDate.asStateFlow()
-    // ================================================
+    // ===============================================
+    //Multimedia
+    private val _photos = MutableStateFlow<List<Uri>>(emptyList())
+    val photos: StateFlow<List<Uri>> = _photos.asStateFlow()
 
+    private val _selectedImage = MutableStateFlow<Uri?>(null)
+    val selectedImage: StateFlow<Uri?> = _selectedImage.asStateFlow()
+
+    private val _showImageViewer = MutableStateFlow(false)
+    val showImageViewer: StateFlow<Boolean> = _showImageViewer.asStateFlow()
+
+    private val _tempPhotoUri = MutableStateFlow<Uri?>(null)
+    val tempPhotoUri: StateFlow<Uri?> = _tempPhotoUri.asStateFlow()
 
     init {
         loadAllItems()
@@ -257,6 +269,40 @@ class ItemViewModel(
         _isTask.value = false
         _isCompleted.value = false
         _dueDate.value = null // Limpiar
+    }
+
+    /** Genera una URI segura para tomar foto */
+    fun createImageUri(): Uri {
+        val context = getApplication<Application>().applicationContext
+        val uri = com.proyectofinal.providers.MiFileProviderMultimedia.getImageUri(context)
+        _tempPhotoUri.value = uri
+        return uri
+    }
+
+    /** Una vez tomada la foto desde UI */
+    fun onPictureTaken(success: Boolean) {
+        val uri = _tempPhotoUri.value ?: return
+        if (success) {
+            _photos.value = _photos.value + uri
+        }
+    }
+
+    /** Abrir visor **/
+    fun openImage(uri: Uri) {
+        _selectedImage.value = uri
+        _showImageViewer.value = true
+    }
+
+    /** Cerrar visor **/
+    fun closeImageViewer() {
+        _showImageViewer.value = false
+    }
+
+    /** Eliminar foto **/
+    fun deleteSelectedImage() {
+        val img = _selectedImage.value ?: return
+        _photos.value = _photos.value.filter { it != img }
+        _showImageViewer.value = false
     }
 }
 

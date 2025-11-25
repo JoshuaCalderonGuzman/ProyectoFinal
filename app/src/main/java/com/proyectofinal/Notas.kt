@@ -26,8 +26,19 @@ import com.proyectofinal.viewmodel.ItemViewModel
 import java.util.Calendar // Necesario para manejar fechas
 import android.app.DatePickerDialog // Necesario para DatePicker
 import android.app.TimePickerDialog // Necesario para TimePicker
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.util.Log
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.ui.zIndex
+import androidx.core.content.ContextCompat
+import com.proyectofinal.providers.MiFileProviderMultimedia
+import coil.compose.AsyncImage
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +60,10 @@ fun NotaScreen(
     // ⬇️ NUEVO: Estado para la Fecha Límite desde el ViewModel ⬇️
     val dueDateTimestamp by viewModel.dueDate.collectAsState()
     // =============================================
+
+
+
+
 
     // Manejamos estados globales de carga/error
     when (uiState) {
@@ -135,6 +150,8 @@ fun NotaScreen(
         // No hace nada si no es tarea, para mantener el requisito de no cambiar funcionalidad
     }
 
+
+
     if (showTimePicker.value) {
         val calendar = Calendar.getInstance()
         dueDateTimestamp?.let { calendar.timeInMillis = it }
@@ -172,6 +189,7 @@ fun NotaScreen(
             containerColor = MaterialTheme.colorScheme.background
         ) { padding ->
             NotaDetailContent(
+                viewModel= viewModel,
                 padding = padding,
                 title = title,
                 onTitleChange = { viewModel.updateTitle(it) },
@@ -188,6 +206,7 @@ fun NotaScreen(
         }
     } else {
         NotaDetailContent(
+            viewModel= viewModel,
             padding = PaddingValues(0.dp),
             title = title,
             onTitleChange = { viewModel.updateTitle(it) },
@@ -311,6 +330,7 @@ fun CircularCheckbox(
 
 @Composable
 private fun NotaDetailContent(
+    viewModel: ItemViewModel,
     padding: PaddingValues,
     title: String,
     onTitleChange: (String) -> Unit,
@@ -324,6 +344,30 @@ private fun NotaDetailContent(
     onCalendarClick: () -> Unit,
     onSave: () -> Unit
 ) {
+    val context = LocalContext.current
+    val photos by viewModel.photos.collectAsState()
+    val selectedImage by viewModel.selectedImage.collectAsState()
+    val showImageViewer by viewModel.showImageViewer.collectAsState()
+    val tempUri by viewModel.tempPhotoUri.collectAsState()
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        viewModel.onPictureTaken(success)
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            val uri = viewModel.createImageUri()
+            takePictureLauncher.launch(uri)
+        } else {
+            Toast.makeText(context, "Permiso de cámara denegado", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+
+
     Column(
         modifier = Modifier
             .padding(padding)
@@ -367,12 +411,6 @@ private fun NotaDetailContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text(
-            text = stringResource(R.string.archivos),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
 
         Spacer(modifier = Modifier.height(16.dp))
         Text(
@@ -387,8 +425,11 @@ private fun NotaDetailContent(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            items(2) {
-                ArchivoCard(nombre = stringResource(R.string.anotacion))
+            items(photos.size) { index ->
+                val uri = photos[index]
+                FotoCard(uri) {
+                    viewModel.openImage(uri)
+                }
             }
 
             item {
@@ -428,7 +469,19 @@ private fun NotaDetailContent(
                         )
                         DropdownMenuItem(
                             text = { MenuItemText(Icons.Default.PhotoCamera, "Tomar foto") },
-                            onClick = { showMediaMenu = false }
+                            onClick = { showMediaMenu = false
+                                if (ContextCompat.checkSelfPermission(
+                                        context,
+                                        android.Manifest.permission.CAMERA
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    val uri = viewModel.createImageUri()
+                                    takePictureLauncher.launch(uri)
+                                } else {
+                                    cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                                }
+
+                            }
                         )
                         DropdownMenuItem(
                             text = { MenuItemText(Icons.Default.Videocam, "Grabar vídeo") },
@@ -470,13 +523,7 @@ private fun NotaDetailContent(
                     onCheckedChange = onCompletedChange
                 )
             }
-
-            TareaItem(
-                icon = Icons.Default.Call,
-                text = stringResource(R.string.audio),
-                onClick = { /* Acción para Audio */ }
-            )
-
+            Spacer(modifier = Modifier.width(16.dp))
             TareaItem(
                 icon = Icons.Default.DateRange,
                 text = stringResource(R.string.calendario),
@@ -498,6 +545,13 @@ private fun NotaDetailContent(
             }
         }
     }
+    if (showImageViewer && selectedImage != null) {
+        ImageViewer(
+            imageUri = selectedImage!!,
+            onClose = { viewModel.closeImageViewer() },
+            onDelete = { viewModel.deleteSelectedImage() }
+        )
+    }
 }
 
 @Composable
@@ -518,5 +572,73 @@ private fun MenuItemText(icon: ImageVector, text: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
+    }
+}
+@Composable
+fun FotoCard(uri: Uri, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        AsyncImage(
+            model = uri,
+            contentDescription = "Foto tomada",
+            modifier = Modifier
+                .size(76.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable { onClick() }
+        )
+        Text(
+            text = "Foto",
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
+@Composable
+fun ImageViewer(
+    imageUri: Uri,
+    onClose: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.95f)),
+        contentAlignment = Alignment.Center
+    ) {
+
+        // Imagen grande
+        AsyncImage(
+            model = imageUri,
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+                .clip(RoundedCornerShape(12.dp))
+        )
+
+        // CERRAR
+        IconButton(
+            onClick = onClose,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+                .zIndex(10f)
+        ) {
+            Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
+        }
+
+        // ELIMINAR
+        IconButton(
+            onClick = onDelete,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 32.dp)
+                .zIndex(10f)
+        ) {
+            Icon(
+                Icons.Default.Delete,
+                contentDescription = "Eliminar",
+                tint = Color.Red,
+                modifier = Modifier.size(42.dp)
+            )
+        }
     }
 }

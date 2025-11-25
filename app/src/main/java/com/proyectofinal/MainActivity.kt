@@ -20,6 +20,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
 
+
 class MainActivity : ComponentActivity() {
 
     // 1. Crear el lanzador de permisos (Debe estar fuera de onCreate/setContent)
