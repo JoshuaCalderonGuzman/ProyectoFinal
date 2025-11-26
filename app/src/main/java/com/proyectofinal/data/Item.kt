@@ -12,5 +12,10 @@ data class Item(
     val isCompleted: Boolean = false,
     val timestamp: Long = System.currentTimeMillis(),
     // ⬇️ DEBES AGREGAR ESTE CAMPO PARA LA FECHA LÍMITE ⬇️
-    val dueDateTimestamp: Long? = null,
+    val dueDateTimestamp: Long?,
+
+    val photoPaths: List<String>,
+    val videoPaths: List<String>
+
+
 )

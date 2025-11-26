@@ -45,6 +45,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.7") // Check for the latest stable version
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0") // Check for the latest stable version
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    implementation(libs.firebase.crashlytics.buildtools)
     val room_version = "2.6.1"
     implementation("androidx.room:room-runtime:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
@@ -72,5 +73,5 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("io.coil-kt:coil-compose:2.5.0")
     implementation("io.coil-kt.coil3:coil-compose:3.0.0")
-
+    implementation("com.google.code.gson:gson:2.10.1")
 }

@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import android.content.Context
 import androidx.room.Room
+import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
@@ -14,11 +15,16 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         // INTEGER se usa para almacenar Long (timestamp).
         // DEFAULT NULL permite que las notas existentes tengan valor nulo sin problema.
         db.execSQL("ALTER TABLE items ADD COLUMN dueDateTimestamp INTEGER DEFAULT NULL")
+        db.execSQL("ALTER TABLE items ADD COLUMN photoPaths TEXT NOT NULL DEFAULT '[]'")
+
+        // 3. Añadir videoPaths (maneja List<String> con TypeConverter)
+        db.execSQL("ALTER TABLE items ADD COLUMN videoPaths TEXT NOT NULL DEFAULT '[]'")
     }
 }
 
 // ⬇️ La versión de la base de datos se incrementa a 2 ⬇️
 @Database(entities = [Item::class], version = 2, exportSchema = false)
+@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun itemDao(): ItemDao
 

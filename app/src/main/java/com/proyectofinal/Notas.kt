@@ -26,6 +26,7 @@ import com.proyectofinal.viewmodel.ItemViewModel
 import java.util.Calendar // Necesario para manejar fechas
 import android.app.DatePickerDialog // Necesario para DatePicker
 import android.app.TimePickerDialog // Necesario para TimePicker
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
@@ -38,6 +39,7 @@ import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import com.proyectofinal.providers.MiFileProviderMultimedia
 import coil.compose.AsyncImage
+import android.Manifest
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,9 +93,17 @@ fun NotaScreen(
 
     // Objeto base para saber el ID (si es 0 es nuevo)
     // ⚠️ ATENCIÓN: Se asume que Item tiene un campo Long? llamado `dueDateTimestamp`
-    val itemBase = currentItem ?: Item(id = 0, title = "", description = "", isTask = false, isCompleted = false /*, dueDateTimestamp = null*/)
-
-    // Función para Guardar
+    val itemBase = currentItem ?: Item(
+        id = 0,
+        title = "",
+        description = null,
+        isTask = false,
+        isCompleted = false,
+        // timestamp se llena automáticamente
+        dueDateTimestamp = null,              // <-- Añadir
+        photoPaths = emptyList(),             // <-- Añadir
+        videoPaths = emptyList()              // <-- Añadir
+    )    // Función para Guardar
     val saveAction = {
         val toSave = itemBase.copy(
             title = title.trim(),
@@ -346,23 +356,96 @@ private fun NotaDetailContent(
 ) {
     val context = LocalContext.current
     val photos by viewModel.photos.collectAsState()
+    val videos by viewModel.videos.collectAsState()
     val selectedImage by viewModel.selectedImage.collectAsState()
     val showImageViewer by viewModel.showImageViewer.collectAsState()
-    val tempUri by viewModel.tempPhotoUri.collectAsState()
+    val photoPaths by viewModel.photoPaths.collectAsState()
+    val videoPaths by viewModel.videoPaths.collectAsState()
+    val photoUris = remember(photoPaths) {
+        photoPaths.mapNotNull { path -> viewModel.getContentUriFromRelativePath(path) }
+    }
+    val videoUris = remember(videoPaths) {
+        videoPaths.mapNotNull { path -> viewModel.getContentUriFromRelativePath(path) }
+    }
+
     val takePictureLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success ->
         viewModel.onPictureTaken(success)
     }
 
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            val uri = viewModel.createImageUri()
-            takePictureLauncher.launch(uri)
+    val recordVideoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CaptureVideo()
+    ) { success ->
+        viewModel.onVideoRecorded(success)
+    }
+    val pendingAction = remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    val cameraAndAudioPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val cameraGranted = permissions[Manifest.permission.CAMERA] == true
+        val audioGranted = permissions[Manifest.permission.RECORD_AUDIO] == true
+
+        if (cameraGranted && audioGranted) {
+            pendingAction.value?.invoke()
+            pendingAction.value = null
         } else {
-            Toast.makeText(context, "Permiso de cámara denegado", Toast.LENGTH_SHORT).show()
+            val denied = if (!cameraGranted && !audioGranted) "Cámara y Audio" else if (!cameraGranted) "Cámara" else "Audio"
+            Toast.makeText(context, "Permisos de $denied denegados.", Toast.LENGTH_LONG).show()
+            pendingAction.value = null
+        }
+    }
+
+    val checkCameraAndAudioPermissionsAndLaunch: (action: () -> Unit) -> Unit = { action ->
+        val hasCameraPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val hasAudioPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        pendingAction.value = action
+
+        if (hasCameraPermission && hasAudioPermission) {
+            action()
+        } else {
+            cameraAndAudioPermissionLauncher.launch(
+                arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+            )
+        }
+    }
+    if (selectedImage != null) {
+        val selectedUri = selectedImage!!
+
+        // Determinar si la URI seleccionada es un video o una imagen (por su extensión o por dónde se almacena)
+        // La forma más fácil de diferenciar aquí es si la URI está en la lista de videos.
+        val isVideo = videos.contains(selectedUri)
+
+        if (showImageViewer && !isVideo) { // Es una foto, usa el visor de Compose
+            ImageViewer(
+                imageUri = selectedUri,
+                onClose = { viewModel.closeImageViewer() },
+                onDelete = { viewModel.deleteSelectedMedia() }
+            )
+        } else if (showImageViewer && isVideo) { // Es un video
+            // ⚠️ OPCIÓN 1: LANZAR REPRODUCTOR EXTERNO DIRECTAMENTE
+            val playIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(selectedUri, "video/*")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            try {
+                context.startActivity(playIntent)
+            } catch (e: Exception) {
+                Toast.makeText(context, "No se encontró un reproductor de video.", Toast.LENGTH_SHORT).show()
+                Log.e("NotaScreen", "Error al reproducir video: ${e.message}")
+            }
+
+            // Cierra el "visor" inmediatamente después de lanzar la actividad,
+            // ya que el video se abre en una app externa.
+            viewModel.closeImageViewer()
+
         }
     }
 
@@ -425,10 +508,26 @@ private fun NotaDetailContent(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            items(photos.size) { index ->
-                val uri = photos[index]
-                FotoCard(uri) {
-                    viewModel.openImage(uri)
+            items(photoPaths.size) { index ->
+                val path = photoPaths[index]
+                val uri = photoUris.getOrNull(index)
+                if (uri != null) {
+                    FotoCard(
+                        uri = uri,
+                        onClick = { viewModel.openImage(uri) },
+                        onDelete = { deletedUri -> viewModel.deleteMediaByUri(deletedUri) } // Pasa el callback
+                    )
+                }
+            }
+            items(videoPaths.size) { index ->
+                val path = videoPaths[index]
+                val uri = videoUris.getOrNull(index)
+                if (uri != null) {
+                    VideoCard(
+                        uri = uri,
+                        onClick = { viewModel.openImage(uri) },
+                        onDelete = { deletedUri -> viewModel.deleteMediaByUri(deletedUri) }
+                    )
                 }
             }
 
@@ -470,22 +569,19 @@ private fun NotaDetailContent(
                         DropdownMenuItem(
                             text = { MenuItemText(Icons.Default.PhotoCamera, "Tomar foto") },
                             onClick = { showMediaMenu = false
-                                if (ContextCompat.checkSelfPermission(
-                                        context,
-                                        android.Manifest.permission.CAMERA
-                                    ) == PackageManager.PERMISSION_GRANTED
-                                ) {
+                                checkCameraAndAudioPermissionsAndLaunch { // Pasa la acción de lanzamiento
                                     val uri = viewModel.createImageUri()
                                     takePictureLauncher.launch(uri)
-                                } else {
-                                    cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
                                 }
-
                             }
                         )
                         DropdownMenuItem(
                             text = { MenuItemText(Icons.Default.Videocam, "Grabar vídeo") },
-                            onClick = { showMediaMenu = false }
+                            onClick = { showMediaMenu = false
+                                checkCameraAndAudioPermissionsAndLaunch { // Pasa la acción de lanzamiento
+                                    val uri = viewModel.createVideoUri()
+                                    recordVideoLauncher.launch(uri)
+                                }}
                         )
                         DropdownMenuItem(
                             text = { MenuItemText(Icons.Default.Mic, "Grabar audio") },
@@ -575,16 +671,101 @@ private fun MenuItemText(icon: ImageVector, text: String) {
     }
 }
 @Composable
-fun FotoCard(uri: Uri, onClick: () -> Unit) {
+fun VideoCard(
+    uri: Uri,
+    onClick: () -> Unit,
+    onDelete: (Uri) -> Unit // NUEVO: Callback para eliminar
+) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        AsyncImage(
-            model = uri,
-            contentDescription = "Foto tomada",
+        Box( // Contenedor para el video y el botón de eliminar
             modifier = Modifier
                 .size(76.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .clickable { onClick() }
+        ) {
+            // Usamos AsyncImage para obtener el thumbnail del video si es posible
+            AsyncImage(
+                model = uri,
+                contentDescription = "Video grabado",
+                modifier = Modifier
+                    .fillMaxSize() // La imagen rellena el Box
+                    .clickable { onClick() }
+            )
+            // Ícono de reproducción sobre el thumbnail
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "Reproducir Video",
+                tint = Color.White,
+                modifier = Modifier
+                    .size(36.dp)
+                    .align(Alignment.Center)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(4.dp)
+                    .zIndex(1f) // Asegura que esté sobre la imagen, pero debajo de la 'X'
+            )
+
+            // Botón de eliminar ('X')
+            IconButton(
+                onClick = { onDelete(uri) }, // Llama a onDelete con la URI
+                modifier = Modifier
+                    .align(Alignment.TopStart) // Posición: Superior izquierda
+                    .size(24.dp) // Tamaño del botón (ajusta si es necesario)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape) // Fondo semitransparente
+                    .zIndex(2f) // Asegura que esté por encima del thumbnail y del botón de Play
+                    .padding(2.dp) // Pequeño padding interno para el icono
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Eliminar video",
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp) // Tamaño del icono
+                )
+            }
+        }
+        Text(
+            text = "Video",
+            style = MaterialTheme.typography.bodySmall
         )
+    }
+}
+@Composable
+fun FotoCard(
+    uri: Uri,
+    onClick: () -> Unit,
+    onDelete: (Uri) -> Unit // NUEVO: Callback para eliminar
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box( // Contenedor para la imagen y el botón de eliminar
+            modifier = Modifier
+                .size(76.dp)
+                .clip(RoundedCornerShape(12.dp))
+        ) {
+            AsyncImage(
+                model = uri,
+                contentDescription = "Foto tomada",
+                modifier = Modifier
+                    .fillMaxSize() // La imagen rellena el Box
+                    .clickable { onClick() }
+            )
+
+            // Botón de eliminar (la 'X')
+            IconButton(
+                onClick = { onDelete(uri) }, // Llama a onDelete con la URI
+                modifier = Modifier
+                    .align(Alignment.TopStart) // Posición: Superior izquierda
+                    .size(24.dp) // Tamaño del botón (ajusta si es necesario)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape) // Fondo semitransparente
+                    .zIndex(2f) // Asegura que esté por encima de la imagen
+                    .padding(2.dp) // Pequeño padding interno para el icono
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Eliminar foto",
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp) // Tamaño del icono
+                )
+            }
+        }
         Text(
             text = "Foto",
             style = MaterialTheme.typography.bodySmall
@@ -618,27 +799,19 @@ fun ImageViewer(
         IconButton(
             onClick = onClose,
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-                .zIndex(10f)
-        ) {
-            Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
-        }
-
-        // ELIMINAR
-        IconButton(
-            onClick = onDelete,
-            modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 32.dp)
                 .zIndex(10f)
         ) {
-            Icon(
-                Icons.Default.Delete,
-                contentDescription = "Eliminar",
-                tint = Color.Red,
-                modifier = Modifier.size(42.dp)
-            )
+            Icon(Icons.Default.Close, contentDescription = "Cerrar",
+                tint = Color.White,
+                modifier = Modifier.size(42.dp))
         }
+
+
     }
 }
+
+
+
+
