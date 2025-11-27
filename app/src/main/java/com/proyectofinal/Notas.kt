@@ -106,7 +106,8 @@ fun NotaScreen(
         dueDateTimestamp = null,              // <-- Añadir
         photoPaths = emptyList(),             // <-- Añadir
         videoPaths = emptyList(),              // <-- Añadir
-        audioPaths = emptyList()              // <-- Añadir
+        audioPaths = emptyList(),              // <-- Añadir
+        filePaths = emptyList()                // <-- Añadir
     )    // Función para Guardar
     val saveAction = {
         val toSave = itemBase.copy(
@@ -366,6 +367,7 @@ private fun NotaDetailContent(
     val photoPaths by viewModel.photoPaths.collectAsState()
     val videoPaths by viewModel.videoPaths.collectAsState()
     val audioPaths by viewModel.audioPaths.collectAsState()
+    val filePaths by viewModel.filePaths.collectAsState()
     val isRecording by viewModel.isRecording.collectAsState()
     //Inicia,os el grabador
     val audioRecorder = remember(context) { AudioRecorder(context) }
@@ -379,6 +381,12 @@ private fun NotaDetailContent(
     val audioUris = remember(audioPaths) {
         audioPaths.mapNotNull { path -> viewModel.getContentUriFromRelativePath(path) }
     }
+    val fileUris = remember(filePaths) {
+        // Los filePaths son directamente los URIs de contenido guardados como String
+        filePaths.mapNotNull { uriString ->
+            try { Uri.parse(uriString) } catch (e: Exception) { null }
+        }
+    }
 
     val takePictureLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
@@ -391,6 +399,11 @@ private fun NotaDetailContent(
         ActivityResultContracts.CaptureVideo()
     ) { success ->
         viewModel.onVideoRecorded(success)
+    }
+    val selectFileLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        viewModel.onFileSelected(uri)
     }
     val pendingAction = remember { mutableStateOf<(() -> Unit)?>(null) }
 
@@ -429,6 +442,7 @@ private fun NotaDetailContent(
             )
         }
     }
+
     if (selectedImage != null) {
         val selectedUri = selectedImage!!
 
@@ -536,6 +550,16 @@ private fun NotaDetailContent(
                 }
 
             }
+            items(filePaths.size) { index -> // 👈 NUEVO
+                val uri = fileUris.getOrNull(index)
+                if (uri != null) {
+                    FileCard(
+                        uri = uri,
+                        onClick = { openFile(context, uri) },
+                        onDelete = { deletedUri -> viewModel.deleteMediaByUri(deletedUri) }
+                    )
+                }
+            }
 
             item {
                 Box(
@@ -636,7 +660,9 @@ private fun NotaDetailContent(
                         )
                         DropdownMenuItem(
                             text = { MenuItemText(Icons.Default.AttachFile, "Archivo") },
-                            onClick = { showMediaMenu = false }
+                            onClick = { showMediaMenu = false
+                                        selectFileLauncher.launch(arrayOf("*/*"))
+                            }
                         )
                     }
                 }
@@ -858,6 +884,53 @@ fun AudioCard(
         )
     }
 }
+
+@Composable
+fun FileCard(
+    uri: Uri,
+    onClick: () -> Unit,
+    onDelete: (Uri) -> Unit
+) {
+    val context = LocalContext.current
+    // Obtenemos el nombre del archivo
+    val fileName = remember(uri) { getFileNameFromUri(context, uri) }
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(76.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable { onClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Description, // Ícono de archivo
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // Botón de eliminar
+            IconButton(
+                onClick = { onDelete(uri) },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .size(24.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    .zIndex(2f)
+                    .padding(2.dp)
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "Eliminar archivo", tint = Color.White, modifier = Modifier.size(16.dp))
+            }
+        }
+        Text(
+            text = fileName.substringBefore('.'), // Mostrar el nombre sin extensión si es muy largo
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1
+        )
+    }
+}
 @Composable
 fun ImageViewer(
     imageUri: Uri,
@@ -897,6 +970,24 @@ fun ImageViewer(
     }
 }
 
+fun getFileNameFromUri(context: Context, uri: Uri): String {
+    // Intentar obtener el nombre del archivo usando ContentResolver
+    var fileName = "Archivo Seleccionado"
+    if (uri.scheme == "content") {
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val displayNameIndex = cursor.getColumnIndex("_display_name")
+                if (displayNameIndex != -1) {
+                    fileName = cursor.getString(displayNameIndex)
+                }
+            }
+        }
+    } else if (uri.path != null) {
+        fileName = uri.lastPathSegment ?: "Archivo Local"
+    }
+    return fileName
+}
+
 fun playVideo(context: Context, uri: Uri, viewModel: ItemViewModel) {
     // Crear el Intent para ver el contenido (reproducción)
     val playIntent = Intent(Intent.ACTION_VIEW).apply {
@@ -927,6 +1018,18 @@ fun playAudio(context: Context, uri: Uri ) {
         } catch (e: Exception) {
             Toast.makeText(context, "No se encontró un reproductor de audio.", Toast.LENGTH_SHORT).show()
         }
+}
+
+fun openFile(context: Context, uri: Uri) {
+    val openIntent = Intent(Intent.ACTION_VIEW).apply {
+        setData(uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    try {
+        context.startActivity(openIntent)
+    } catch (e: Exception) {
+        Toast.makeText(context, "No se encontró una aplicación para abrir este archivo.", Toast.LENGTH_SHORT).show()
+    }
 }
 
 

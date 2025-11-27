@@ -16,7 +16,8 @@ data class Item(
 
     val photoPaths: List<String>,
     val videoPaths: List<String>,
-    val audioPaths: List<String>
+    val audioPaths: List<String>,
+    val filePaths: List<String>
 
 
 )

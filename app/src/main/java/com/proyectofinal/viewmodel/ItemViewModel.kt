@@ -102,7 +102,14 @@ class ItemViewModel(
     private val _tempAudioPath = MutableStateFlow<String?>(null)
     val tempAudioPath: StateFlow<String?> = _tempAudioPath.asStateFlow()
     private val _isRecording = MutableStateFlow(false)
+
+    private val _filePaths = MutableStateFlow<List<String>>(emptyList())
+    val filePaths: StateFlow<List<String>> = _filePaths.asStateFlow()
+
+    private val _tempFileUri = MutableStateFlow<Uri?>(null)
+    val tempFileUri: StateFlow<Uri?> = _tempFileUri.asStateFlow()
     val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
+
 
     init {
         loadAllItems()
@@ -162,7 +169,8 @@ class ItemViewModel(
             dueDateTimestamp = null,
             photoPaths = emptyList(),
             videoPaths = emptyList(),
-            audioPaths = emptyList()
+            audioPaths = emptyList(),
+            filePaths = emptyList()
         )
         _currentItemState.value = newItem
         updateFormState(newItem)
@@ -180,6 +188,7 @@ class ItemViewModel(
         _photoPaths.value = item.photoPaths
         _videoPaths.value = item.videoPaths
         _audioPaths.value = item.audioPaths
+        _filePaths.value = item.filePaths
 
         //Limpia Temporal
         _tempPhotoPath.value = null
@@ -257,7 +266,8 @@ class ItemViewModel(
                     dueDateTimestamp = _dueDate.value, // Incluir el nuevo campo
                     photoPaths = _photoPaths.value,
                     videoPaths = _videoPaths.value,
-                    audioPaths = _audioPaths.value
+                    audioPaths = _audioPaths.value,
+                    filePaths = _filePaths.value
                 )
 
                 if (itemToSave.id == 0) {
@@ -401,6 +411,27 @@ class ItemViewModel(
         _tempAudioPath.value = null
         _tempAudioUri.value = null
     }
+    //ARCHIVOS
+    fun onFileSelected(uri: Uri?) {
+        if (uri == null) return
+
+        val context = getApplication<Application>().applicationContext
+
+        try{
+            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            context.contentResolver.takePersistableUriPermission(uri, flags)        }catch (e: SecurityException){
+            Log.e("ItemViewModel", "Error al tomar permiso de persistencia: ${e.message}")
+            return
+        }
+        //Solo guardamos el URI de Contenido como String
+        val uriString = uri.toString()
+        //Guardar el String URI en la lista
+        _filePaths.value = _filePaths.value + uriString
+        //Limpiar temporal
+        _tempFileUri.value = null
+
+    }
+
 
 
 
@@ -429,10 +460,21 @@ class ItemViewModel(
             _videoPaths.value = _videoPaths.value.filter { it != relativePath }
         }else if (_audioPaths.value.contains(relativePath)) {
             _audioPaths.value = _audioPaths.value.filter { it != relativePath }
+        }else{
+            deleteFileByPath(relativePath)
         }
     }
     fun getContentUriFromRelativePath(relativePath: String): Uri? {
         val context = getApplication<Application>().applicationContext
+
+        try {
+            val uri = Uri.parse(relativePath)
+            if (uri.scheme == "content" || uri.scheme == "file") {
+                return uri
+            }
+        }catch (e: Exception){
+            Log.e("ItemViewModel", "Error al parsear URI: ${e.message}")
+        }
 
         // Reconstruye el archivo File
         val baseDir = context.filesDir
@@ -449,6 +491,10 @@ class ItemViewModel(
     }
 
     private fun getRelativePathFromContentUri(contentUri: Uri): String? {
+        if (_filePaths.value.contains(contentUri.toString())) {
+            return contentUri.toString() // Devolvemos el URI como String/Path
+        }
+
         val allPaths = _photoPaths.value + _videoPaths.value + _audioPaths.value
 
         for (path in allPaths) {
@@ -465,6 +511,16 @@ class ItemViewModel(
         // Combina todas las rutas a eliminar
         val allPaths = item.photoPaths + item.videoPaths + item.audioPaths
 
+        item.filePaths.forEach { uriString ->
+            try {
+                val uri = Uri.parse(uriString)
+                val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                context.contentResolver.releasePersistableUriPermission(uri, flags)
+                Log.d("ItemViewModel", "Permiso persistente liberado para: $uriString")
+            } catch (e: Exception) {
+                Log.e("ItemViewModel", "Error al liberar permiso para URI: ${e.message}")
+            }
+        }
 
         allPaths.forEach { relativePath ->
             val fileToDelete = File(baseDir, relativePath)
@@ -476,6 +532,23 @@ class ItemViewModel(
                     Log.e("ItemViewModel", "Error al eliminar archivo $relativePath: ${e.message}")
                 }
             }
+        }
+
+    }
+
+    private fun deleteFileByPath(uriString: String) {
+        //Si la ruta es un URI de archivo, lo eliminamos de la lista
+        if (_filePaths.value.contains(uriString)){
+            val context = getApplication<Application>().applicationContext
+            try{
+                val uri = Uri.parse(uriString)
+                val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                context.contentResolver.releasePersistableUriPermission(uri, flags)
+            }catch (e: Exception){
+                Log.e("ItemViewModel", "Error al liberar permiso de persistencia: ${e.message}")
+            }
+
+            _filePaths.value = _filePaths.value.filter { it != uriString }
         }
     }
     /*private fun deleteSingleMediaFileByPath(relativePath: String) {
