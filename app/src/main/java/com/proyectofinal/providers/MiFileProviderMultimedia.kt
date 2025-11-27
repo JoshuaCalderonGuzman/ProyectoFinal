@@ -43,8 +43,24 @@ class MiFileProviderMultimedia: FileProvider(
             // 4. Devolver la Uri de contenido FileProvider
             val relativePath = "videos/$fileName"
 
-            return MediaFile(contentUri, relativePath)        }
+            return MediaFile(contentUri, relativePath)
+        }
 
+        fun getAudioUri (ctx : Context): MediaFile {
+            //Creamor el directori especifico para audios
+            val dirAudio = File(ctx.filesDir, "audio")
+            dirAudio.mkdirs()
+            //Creamos el archivo con extension .mp3
+            val fileName = "aud_${System.currentTimeMillis()}.mp3"
+            val fileAudio = File(dirAudio, fileName)
+            //Definimos la autoridad del FileProvider
+            val auth = ctx.packageName + ".fileprovidermultimedia"
+            val contentUri = getUriForFile(ctx, auth, fileAudio)
+            //Devolvemos la Uri de contenido FileProvider
+            val relativePath = "audio/$fileName"
+
+            return MediaFile(contentUri, relativePath)
+        }
     }
 
 }

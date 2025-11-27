@@ -16,9 +16,10 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         // DEFAULT NULL permite que las notas existentes tengan valor nulo sin problema.
         db.execSQL("ALTER TABLE items ADD COLUMN dueDateTimestamp INTEGER DEFAULT NULL")
         db.execSQL("ALTER TABLE items ADD COLUMN photoPaths TEXT NOT NULL DEFAULT '[]'")
-
         // 3. Añadir videoPaths (maneja List<String> con TypeConverter)
         db.execSQL("ALTER TABLE items ADD COLUMN videoPaths TEXT NOT NULL DEFAULT '[]'")
+        db.execSQL("ALTER TABLE items ADD COLUMN audioPaths TEXT NOT NULL DEFAULT '[]'")
+
     }
 }
 

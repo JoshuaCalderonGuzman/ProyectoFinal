@@ -40,6 +40,9 @@ import androidx.core.content.ContextCompat
 import com.proyectofinal.providers.MiFileProviderMultimedia
 import coil.compose.AsyncImage
 import android.Manifest
+import android.app.Activity
+import android.content.Context
+import com.proyectofinal.util.AudioRecorder
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,7 +105,8 @@ fun NotaScreen(
         // timestamp se llena automáticamente
         dueDateTimestamp = null,              // <-- Añadir
         photoPaths = emptyList(),             // <-- Añadir
-        videoPaths = emptyList()              // <-- Añadir
+        videoPaths = emptyList(),              // <-- Añadir
+        audioPaths = emptyList()              // <-- Añadir
     )    // Función para Guardar
     val saveAction = {
         val toSave = itemBase.copy(
@@ -361,11 +365,19 @@ private fun NotaDetailContent(
     val showImageViewer by viewModel.showImageViewer.collectAsState()
     val photoPaths by viewModel.photoPaths.collectAsState()
     val videoPaths by viewModel.videoPaths.collectAsState()
+    val audioPaths by viewModel.audioPaths.collectAsState()
+    val isRecording by viewModel.isRecording.collectAsState()
+    //Inicia,os el grabador
+    val audioRecorder = remember(context) { AudioRecorder(context) }
+
     val photoUris = remember(photoPaths) {
         photoPaths.mapNotNull { path -> viewModel.getContentUriFromRelativePath(path) }
     }
     val videoUris = remember(videoPaths) {
         videoPaths.mapNotNull { path -> viewModel.getContentUriFromRelativePath(path) }
+    }
+    val audioUris = remember(audioPaths) {
+        audioPaths.mapNotNull { path -> viewModel.getContentUriFromRelativePath(path) }
     }
 
     val takePictureLauncher = rememberLauncherForActivityResult(
@@ -373,6 +385,7 @@ private fun NotaDetailContent(
     ) { success ->
         viewModel.onPictureTaken(success)
     }
+
 
     val recordVideoLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CaptureVideo()
@@ -421,31 +434,13 @@ private fun NotaDetailContent(
 
         // Determinar si la URI seleccionada es un video o una imagen (por su extensión o por dónde se almacena)
         // La forma más fácil de diferenciar aquí es si la URI está en la lista de videos.
-        val isVideo = videos.contains(selectedUri)
 
-        if (showImageViewer && !isVideo) { // Es una foto, usa el visor de Compose
+
+        if (showImageViewer) { // Es una foto, usa el visor de Compose
             ImageViewer(
                 imageUri = selectedUri,
-                onClose = { viewModel.closeImageViewer() },
-                onDelete = { viewModel.deleteSelectedMedia() }
+                onClose = { viewModel.closeImageViewer() }
             )
-        } else if (showImageViewer && isVideo) { // Es un video
-            // ⚠️ OPCIÓN 1: LANZAR REPRODUCTOR EXTERNO DIRECTAMENTE
-            val playIntent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(selectedUri, "video/*")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            try {
-                context.startActivity(playIntent)
-            } catch (e: Exception) {
-                Toast.makeText(context, "No se encontró un reproductor de video.", Toast.LENGTH_SHORT).show()
-                Log.e("NotaScreen", "Error al reproducir video: ${e.message}")
-            }
-
-            // Cierra el "visor" inmediatamente después de lanzar la actividad,
-            // ya que el video se abre en una app externa.
-            viewModel.closeImageViewer()
-
         }
     }
 
@@ -525,10 +520,21 @@ private fun NotaDetailContent(
                 if (uri != null) {
                     VideoCard(
                         uri = uri,
-                        onClick = { viewModel.openImage(uri) },
+                        onClick = { playVideo(context, uri, viewModel) },
                         onDelete = { deletedUri -> viewModel.deleteMediaByUri(deletedUri) }
                     )
                 }
+            }
+            items (audioPaths.size){ index ->
+                val uri = audioUris.getOrNull(index)
+                if (uri != null) {
+                    AudioCard(
+                        uri = uri,
+                        onClick = { playAudio(context, uri) },
+                        onDelete = { deletedUri -> viewModel.deleteMediaByUri(deletedUri) }
+                    )
+                }
+
             }
 
             item {
@@ -585,7 +591,48 @@ private fun NotaDetailContent(
                         )
                         DropdownMenuItem(
                             text = { MenuItemText(Icons.Default.Mic, "Grabar audio") },
-                            onClick = { showMediaMenu = false }
+                            onClick = { showMediaMenu = false
+                                if (isRecording) {
+                                    try {
+                                        audioRecorder.stop()
+                                        viewModel.stopAudioRecording(true)
+                                    }catch (e: Exception){
+                                        Log.e("Audio", "Error al detener: ${e.message}")
+                                        viewModel.stopAudioRecording(false) // Falló al detener
+                                        Toast.makeText(context, "Error al detener la grabación.", Toast.LENGTH_LONG).show()
+                                    }
+                                }else{
+                                    checkCameraAndAudioPermissionsAndLaunch { // Requiere RECORD_AUDIO
+                                        try {
+                                            // 1. Creamos la estructura de archivo (Usando el nombre correcto: getAudioUri)
+                                            val mediaFile =
+                                                com.proyectofinal.providers.MiFileProviderMultimedia.getAudioUri(
+                                                    context
+                                                )
+
+                                            // 2. Obtenemos la ruta ABSOLUTA para MediaRecorder
+                                            // NOTA: context.filesDir.resolve(relativePath) construye la ruta absoluta
+                                            val absolutePath =
+                                                context.filesDir.resolve(mediaFile.relativePath).absolutePath
+
+                                            // 3. Iniciar la grabación con la ruta absoluta
+                                            audioRecorder.start(absolutePath)
+
+                                            // 4. Actualizar el ViewModel
+                                            viewModel.startAudioRecording(mediaFile.relativePath)
+
+                                        } catch (e: Exception) {
+                                            Log.e("Audio", "Error al iniciar: ${e.message}")
+                                            viewModel.stopAudioRecording(false) // Resetear estado si falla
+                                            Toast.makeText(
+                                                context,
+                                                "Error al iniciar la grabación. ¿Micrófono en uso?",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
+                                }
+                            }
                         )
                         DropdownMenuItem(
                             text = { MenuItemText(Icons.Default.AttachFile, "Archivo") },
@@ -644,8 +691,7 @@ private fun NotaDetailContent(
     if (showImageViewer && selectedImage != null) {
         ImageViewer(
             imageUri = selectedImage!!,
-            onClose = { viewModel.closeImageViewer() },
-            onDelete = { viewModel.deleteSelectedImage() }
+            onClose = { viewModel.closeImageViewer() }
         )
     }
 }
@@ -772,11 +818,50 @@ fun FotoCard(
         )
     }
 }
+
+@Composable
+fun AudioCard(
+    uri: Uri,
+    onClick: () -> Unit,
+    onDelete: (Uri) -> Unit // NUEVO: Callback para eliminar
+){
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(76.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable{ onClick() },
+            contentAlignment = Alignment.Center
+        ){
+            Icon(
+                imageVector = Icons.Default.Mic,
+                contentDescription = "Reproducir Audio",
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            IconButton(
+                onClick = { onDelete(uri) }, // Llama a onDelete con la URI
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .size(24.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    .zIndex(2f)
+                    .padding(2.dp)
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "Eliminar audio", tint = Color.White, modifier = Modifier.size(16.dp))
+            }
+        }
+        Text(
+            text = "Audio",
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
 @Composable
 fun ImageViewer(
     imageUri: Uri,
-    onClose: () -> Unit,
-    onDelete: () -> Unit
+    onClose: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -811,6 +896,39 @@ fun ImageViewer(
 
     }
 }
+
+fun playVideo(context: Context, uri: Uri, viewModel: ItemViewModel) {
+    // Crear el Intent para ver el contenido (reproducción)
+    val playIntent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "video/*")
+        // Permiso esencial para que la app externa pueda leer el archivo seguro
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
+    // Intentar lanzar la actividad
+    try {
+        context.startActivity(playIntent)
+    } catch (e: Exception) {
+        Toast.makeText(context, "No se encontró un reproductor de video.", Toast.LENGTH_SHORT).show()
+        // No es necesario loguear aquí si ya lo haces en el ViewModel/otra parte
+    }
+
+    // Limpiar cualquier estado de visor que pudiera haberse activado por error
+    viewModel.closeImageViewer()
+}
+
+fun playAudio(context: Context, uri: Uri ) {
+        val playIntent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "audio/*")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try{
+            context.startActivity(playIntent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "No se encontró un reproductor de audio.", Toast.LENGTH_SHORT).show()
+        }
+}
+
 
 
 

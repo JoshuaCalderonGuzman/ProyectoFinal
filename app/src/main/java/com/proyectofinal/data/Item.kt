@@ -15,7 +15,8 @@ data class Item(
     val dueDateTimestamp: Long?,
 
     val photoPaths: List<String>,
-    val videoPaths: List<String>
+    val videoPaths: List<String>,
+    val audioPaths: List<String>
 
 
 )
