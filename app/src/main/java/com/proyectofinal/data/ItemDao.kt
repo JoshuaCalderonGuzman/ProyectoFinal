@@ -6,10 +6,9 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ItemDao {
 
-    // ⬇️ MODIFICADO: Cambiar el tipo de retorno a 'Long' ⬇️
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(item: Item): Long
-    // ⬆️ Esto hace que Room devuelva el 'id' generado automáticamente. ⬆️
 
     @Update
     suspend fun update(item: Item)

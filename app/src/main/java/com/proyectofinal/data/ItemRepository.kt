@@ -7,7 +7,7 @@ interface ItemsRepository {
     fun getAllTasks(): Flow<List<Item>>
     suspend fun getItemById(id: Int): Item?
 
-    // ⬇️ MODIFICADO: Ahora devuelve Long (el ID generado) ⬇️
+
     suspend fun insert(item: Item): Long
 
     suspend fun update(item: Item)

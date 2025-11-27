@@ -39,7 +39,7 @@ class NotificationReceiver : BroadcastReceiver() {
 
         // Construir la notificación
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(com.proyectofinal.R.mipmap.ic_launcher) // ⬅️ CAMBIO: Usa el ícono de la aplicación por defecto
+            .setSmallIcon(com.proyectofinal.R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(description)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

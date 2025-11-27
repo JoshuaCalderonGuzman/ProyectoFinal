@@ -14,7 +14,7 @@ data class Item(
     val timestamp: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "reminderTimestamps") // Nuevo nombre para claridad
     val reminderTimestamps: List<Long> = emptyList(),
-    // ⬇️ DEBES AGREGAR ESTE CAMPO PARA LA FECHA LÍMITE ⬇️
+
     val dueDateTimestamp: Long?,
 
     val photoPaths: List<String>,

@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
 
             // Factory con el repositorio y el objeto application inyectados
             val viewModel: ItemViewModel = viewModel(
-                // ⬇️ CORRECCIÓN del error 'No value passed for parameter application' ⬇️
+
                 factory = ItemViewModelFactory(repository, application)
             )
 

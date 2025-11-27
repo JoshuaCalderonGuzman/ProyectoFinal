@@ -243,7 +243,7 @@ class ItemViewModel(
 
     // ===================================
     @SuppressLint("UnspecifiedImmutableFlag")
-    fun cancelNotification(itemId: Int) { // ⬅️ AHORA ES PÚBLICA Y NO NECESITA CONTEXTO EXTERNO
+    fun cancelNotification(itemId: Int) { //  AHORA ES PÚBLICA Y NO NECESITA CONTEXTO EXTERNO
         val context = getApplication<Application>().applicationContext
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
@@ -255,7 +255,7 @@ class ItemViewModel(
         // El PendingIntent debe ser IDÉNTICO al que se usó para establecer la alarma (mismo requestCode: itemId)
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            itemId, // ⬅️ CRUCIAL: Usar el itemId como requestCode
+            itemId, // CRUCIAL: Usar el itemId como requestCode
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -599,7 +599,7 @@ class ItemViewModel(
 }
 
 
-// Factory (NOTA: DEBE SER ACTUALIZADO EN TU CÓDIGO)
+
 class ItemViewModelFactory(
     private val repository: ItemsRepository,
     private val application: Application // Necesario para AndroidViewModel

@@ -62,7 +62,7 @@ fun NotaScreen(
     val description by viewModel.description.collectAsState()
     val isTask by viewModel.isTask.collectAsState()
     val isCompleted by viewModel.isCompleted.collectAsState()
-    // ⬇️ NUEVO: Estado para la Fecha Límite desde el ViewModel ⬇️
+    // Estado para la Fecha Límite desde el ViewModel
     val dueDateTimestamp by viewModel.dueDate.collectAsState()
     // =============================================
 
@@ -116,7 +116,7 @@ fun NotaScreen(
             description = description.trim(),
             isTask = isTask,
             isCompleted = isTask && isCompleted, // Solo completado si es tarea
-            // ⬇️ NUEVO: Guardar el timestamp de la fecha límite ⬇️
+            //  Guardar el timestamp de la fecha límite
             dueDateTimestamp = dueDateTimestamp
         )
         viewModel.saveItem(toSave)
@@ -127,7 +127,7 @@ fun NotaScreen(
         if (isFullScreen) onBack()
     }
 
-    // ⬇️ LÓGICA DEL DATE/TIME PICKER ⬇️
+    // LÓGICA DEL DATE/TIME PICKER
     val context = LocalContext.current
     val showTimePicker = remember { mutableStateOf(false) }
     val showReminderManagement = remember { mutableStateOf(false) }
@@ -184,7 +184,7 @@ fun NotaScreen(
             true // formato 24 horas
         ).show()
     }
-    // ⬆️ FIN LÓGICA DEL DATE/TIME PICKER ⬆️
+    //  FIN LÓGICA DEL DATE/TIME PICKER
 
     if (isFullScreen) {
         Scaffold(
@@ -217,7 +217,7 @@ fun NotaScreen(
                 onTaskChange = { viewModel.updateIsTask(it) },
                 isCompleted = isCompleted,
                 onCompletedChange = { viewModel.updateIsCompleted(it) },
-                // ⬇️ NUEVO: Pasar el callback para el botón de calendario ⬇️
+                // Pasar el callback para el botón de calendario
                 onCalendarClick = onCalendarClick,
                 showReminderManagement = showReminderManagement.value, // Pasa el valor del estado
                 onShowReminderManagement = { showReminderManagement.value = it },
@@ -238,7 +238,7 @@ fun NotaScreen(
             onTaskChange = { viewModel.updateIsTask(it) },
             isCompleted = isCompleted,
             onCompletedChange = { viewModel.updateIsCompleted(it) },
-            // ⬇️ NUEVO: Pasar el callback para el botón de calendario ⬇️
+            //  Pasar el callback para el botón de calendario
             onCalendarClick = onCalendarClick,
             showReminderManagement = showReminderManagement.value, // Pasa el valor del estado
             onShowReminderManagement = { showReminderManagement.value = it },
@@ -365,7 +365,7 @@ private fun NotaDetailContent(
     onTaskChange: (Boolean) -> Unit,
     isCompleted: Boolean,
     onCompletedChange: (Boolean) -> Unit,
-    // ⬇️ NUEVO: Callback para el botón de calendario ⬇️
+    //  Callback para el botón de calendario
     onCalendarClick: () -> Unit,
     showReminderManagement: Boolean, // El estado de visibilidad de la sección
     onShowReminderManagement: (Boolean) -> Unit,
@@ -562,7 +562,7 @@ private fun NotaDetailContent(
                 }
 
             }
-            items(filePaths.size) { index -> // 👈 NUEVO
+            items(filePaths.size) { index ->
                 val uri = fileUris.getOrNull(index)
                 if (uri != null) {
                     FileCard(
@@ -705,7 +705,7 @@ private fun NotaDetailContent(
             TareaItem(
                 icon = Icons.Default.DateRange,
                 text = stringResource(R.string.calendario),
-                // ⬇️ MODIFICADO: Llamada al nuevo callback ⬇️
+                // MODIFICADO: Llamada al nuevo callback
                 onClick = { onShowReminderManagement(true) }
             )
 
