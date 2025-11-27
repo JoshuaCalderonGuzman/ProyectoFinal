@@ -70,6 +70,7 @@ fun NotaScreen(
 
 
 
+
     // Manejamos estados globales de carga/error
     when (uiState) {
         is ItemUiState.Loading -> {
@@ -129,6 +130,7 @@ fun NotaScreen(
     // ⬇️ LÓGICA DEL DATE/TIME PICKER ⬇️
     val context = LocalContext.current
     val showTimePicker = remember { mutableStateOf(false) }
+    val showReminderManagement = remember { mutableStateOf(false) }
 
     val onDateSelected: (year: Int, month: Int, day: Int) -> Unit = { year, month, day ->
         val calendar = Calendar.getInstance()
@@ -204,6 +206,7 @@ fun NotaScreen(
             containerColor = MaterialTheme.colorScheme.background
         ) { padding ->
             NotaDetailContent(
+                item = itemBase,
                 viewModel= viewModel,
                 padding = padding,
                 title = title,
@@ -216,11 +219,15 @@ fun NotaScreen(
                 onCompletedChange = { viewModel.updateIsCompleted(it) },
                 // ⬇️ NUEVO: Pasar el callback para el botón de calendario ⬇️
                 onCalendarClick = onCalendarClick,
+                showReminderManagement = showReminderManagement.value, // Pasa el valor del estado
+                onShowReminderManagement = { showReminderManagement.value = it },
+
                 onSave = saveAndBack
             )
         }
     } else {
         NotaDetailContent(
+            item = itemBase,
             viewModel= viewModel,
             padding = PaddingValues(0.dp),
             title = title,
@@ -233,6 +240,8 @@ fun NotaScreen(
             onCompletedChange = { viewModel.updateIsCompleted(it) },
             // ⬇️ NUEVO: Pasar el callback para el botón de calendario ⬇️
             onCalendarClick = onCalendarClick,
+            showReminderManagement = showReminderManagement.value, // Pasa el valor del estado
+            onShowReminderManagement = { showReminderManagement.value = it },
             onSave = {
                 // Guardamos sin volver (el detalle sigue visible)
                 saveAction()
@@ -345,6 +354,7 @@ fun CircularCheckbox(
 
 @Composable
 private fun NotaDetailContent(
+    item: Item,
     viewModel: ItemViewModel,
     padding: PaddingValues,
     title: String,
@@ -357,6 +367,8 @@ private fun NotaDetailContent(
     onCompletedChange: (Boolean) -> Unit,
     // ⬇️ NUEVO: Callback para el botón de calendario ⬇️
     onCalendarClick: () -> Unit,
+    showReminderManagement: Boolean, // El estado de visibilidad de la sección
+    onShowReminderManagement: (Boolean) -> Unit,
     onSave: () -> Unit
 ) {
     val context = LocalContext.current
@@ -593,10 +605,6 @@ private fun NotaDetailContent(
                             .background(MaterialTheme.colorScheme.surface)
                     ) {
                         DropdownMenuItem(
-                            text = { MenuItemText(Icons.Default.PhotoLibrary, "Galería") },
-                            onClick = { showMediaMenu = false }
-                        )
-                        DropdownMenuItem(
                             text = { MenuItemText(Icons.Default.PhotoCamera, "Tomar foto") },
                             onClick = { showMediaMenu = false
                                 checkCameraAndAudioPermissionsAndLaunch { // Pasa la acción de lanzamiento
@@ -684,6 +692,7 @@ private fun NotaDetailContent(
                 onCheckedChange = onTaskChange
             )
 
+
             // Checkbox: Tarea Completa (solo si es tarea)
             if (isTask) {
                 CircularCheckbox(
@@ -697,9 +706,21 @@ private fun NotaDetailContent(
                 icon = Icons.Default.DateRange,
                 text = stringResource(R.string.calendario),
                 // ⬇️ MODIFICADO: Llamada al nuevo callback ⬇️
-                onClick = onCalendarClick
+                onClick = { onShowReminderManagement(true) }
+            )
+
+        }
+        if (showReminderManagement) {
+            Spacer(Modifier.height(16.dp)) // Añadir un espaciador para separación visual
+            ReminderManagementSection(
+                item = item,
+                viewModel = viewModel,
+                context = context,
+                onDismiss = { onShowReminderManagement(false) },
+                onScheduleReminder = onCalendarClick // Este es el callback que abre el DatePicker
             )
         }
+
 
         // Botón de guardar (solo visible si no hay TopBar, e.g. tablet mode o landscape sin scaffold topbar)
         if (!padding.calculateTopPadding().value.isNaN() && padding.calculateTopPadding() == 0.dp) {
@@ -1029,6 +1050,91 @@ fun openFile(context: Context, uri: Uri) {
         context.startActivity(openIntent)
     } catch (e: Exception) {
         Toast.makeText(context, "No se encontró una aplicación para abrir este archivo.", Toast.LENGTH_SHORT).show()
+    }
+}
+@Composable
+fun ReminderManagementSection(
+    item: Item,
+    viewModel: ItemViewModel,
+    context: Context,
+    onDismiss: () -> Unit,
+    onScheduleReminder: () -> Unit
+) {
+    // Aquí va todo el código que te di en la respuesta anterior
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(16.dp)
+    ) {
+        // ... (Contenido de la sección: Text, Button para añadir/modificar, Row para eliminar)
+        Text(
+            text = "Recordatorios",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        // 1. Botón para programar/añadir un recordatorio
+        Button(
+            onClick = onScheduleReminder,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Outlined.Add, contentDescription = "Añadir recordatorio")
+            Spacer(Modifier.width(8.dp))
+            Text("Añadir/Modificar Recordatorio")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 2. LISTA DEL RECORDATORIO ACTIVO
+        if (item.dueDateTimestamp != null) {
+            val dateText = item.dueDateTimestamp?.let {
+                android.text.format.DateFormat.getDateFormat(context).format(it) + " " +
+                        android.text.format.DateFormat.getTimeFormat(context).format(it)
+            } ?: "Fecha no disponible"
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Muestra el recordatorio
+                Text(
+                    text = "Activo: $dateText",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                // Botón de ELIMINAR Recordatorio
+                IconButton(
+                    onClick = {
+                        // Llama a la función de cancelación en el ViewModel (Asumiendo que ya la implementaste)
+                        viewModel.updateItem(item, newDueDateTimestamp = null)
+                        Toast.makeText(context, "Recordatorio eliminado.", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = "Eliminar recordatorio",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        } else {
+            Text("No hay recordatorios activos para esta nota.", style = MaterialTheme.typography.bodyMedium)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 3. Botón para cerrar la sección
+        Button(onClick = onDismiss) {
+            Text("Cerrar")
+        }
     }
 }
 

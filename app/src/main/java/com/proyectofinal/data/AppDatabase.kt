@@ -19,7 +19,27 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         // 3. Añadir videoPaths (maneja List<String> con TypeConverter)
         db.execSQL("ALTER TABLE items ADD COLUMN videoPaths TEXT NOT NULL DEFAULT '[]'")
         db.execSQL("ALTER TABLE items ADD COLUMN audioPaths TEXT NOT NULL DEFAULT '[]'")
+        db.execSQL("ALTER TABLE items ADD COLUMN filePaths TEXT NOT NULL DEFAULT '[]'")
 
+    }
+}
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // 1. Crear la nueva tabla con la estructura final
+        db.execSQL("CREATE TABLE items_new (id INTEGER PRIMARY KEY NOT NULL, title TEXT NOT NULL, description TEXT, isTask INTEGER NOT NULL, isCompleted INTEGER NOT NULL, timestamp INTEGER NOT NULL, reminderTimestamps TEXT NOT NULL DEFAULT '[]', photoPaths TEXT NOT NULL DEFAULT '[]', videoPaths TEXT NOT NULL DEFAULT '[]', audioPaths TEXT NOT NULL DEFAULT '[]', filePaths TEXT NOT NULL DEFAULT '[]')")
+
+        // 2. Copiar datos de la tabla vieja a la nueva.
+        // Se transforma el viejo dueDateTimestamp (si existe) en un arreglo JSON
+        db.execSQL(
+            "INSERT INTO items_new (id, title, description, isTask, isCompleted, timestamp, reminderTimestamps, photoPaths, videoPaths, audioPaths, filePaths) " +
+                    "SELECT id, title, description, isTask, isCompleted, timestamp, " +
+                    "CASE WHEN dueDateTimestamp IS NOT NULL THEN '[' || dueDateTimestamp || ']' ELSE '[]' END, " + // Migra el Long a List<Long> JSON
+                    "photoPaths, videoPaths, audioPaths, filePaths FROM items"
+        )
+
+        // 3. Eliminar la tabla vieja y renombrar la nueva
+        db.execSQL("DROP TABLE items")
+        db.execSQL("ALTER TABLE items_new RENAME TO items")
     }
 }
 
@@ -41,7 +61,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "app_database"
                 )
                     // ⬇️ AÑADIR LA MIGRACIÓN AQUÍ ⬇️
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2,MIGRATION_2_3)
                     .build()
                 INSTANCE = instance
                 instance

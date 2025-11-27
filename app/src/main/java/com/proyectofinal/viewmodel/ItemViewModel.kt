@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
@@ -59,6 +60,8 @@ class ItemViewModel(
     val isCompleted: StateFlow<Boolean> = _isCompleted.asStateFlow()
 
     // NUEVO ESTADO: Fecha Límite (timestamp en milisegundos)
+    private val _reminders = MutableStateFlow<List<Long>>(emptyList())
+    val reminders: StateFlow<List<Long>> = _reminders.asStateFlow()
     private val _dueDate = MutableStateFlow<Long?>(null)
     val dueDate: StateFlow<Long?> = _dueDate.asStateFlow()
     // ===============================================
@@ -170,7 +173,8 @@ class ItemViewModel(
             photoPaths = emptyList(),
             videoPaths = emptyList(),
             audioPaths = emptyList(),
-            filePaths = emptyList()
+            filePaths = emptyList(),
+            reminderTimestamps = emptyList(),
         )
         _currentItemState.value = newItem
         updateFormState(newItem)
@@ -182,6 +186,7 @@ class ItemViewModel(
         _description.value = item.description ?: ""
         _isTask.value = item.isTask
         _isCompleted.value = item.isCompleted
+        _reminders.value = item.reminderTimestamps.sorted() // Sincronizar y ordenar
         _dueDate.value = item.dueDateTimestamp // Sincronizar
 
         // === CARGAR MULTIMEDIA ===
@@ -207,7 +212,7 @@ class ItemViewModel(
 
         // Si la fecha es inválida/nula, no es tarea, está completada o la fecha ya pasó, cancela la alarma.
         if (item.dueDateTimestamp == null || !item.isTask || item.isCompleted || item.dueDateTimestamp <= System.currentTimeMillis()) {
-            cancelNotification(item.id, context)
+            cancelNotification(item.id)
             return
         }
 
@@ -235,23 +240,29 @@ class ItemViewModel(
         )
     }
 
-    private fun cancelNotification(itemId: Int, context: Context) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(context, NotificationReceiver::class.java)
 
+    // ===================================
+    @SuppressLint("UnspecifiedImmutableFlag")
+    fun cancelNotification(itemId: Int) { // ⬅️ AHORA ES PÚBLICA Y NO NECESITA CONTEXTO EXTERNO
+        val context = getApplication<Application>().applicationContext
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+        val intent = Intent(context, NotificationReceiver::class.java).apply {
+            // Usa el ID del item como ID de la notificación para cancelarla
+            putExtra(NotificationReceiver.NOTIFICATION_ID_KEY, itemId)
+        }
+
+        // El PendingIntent debe ser IDÉNTICO al que se usó para establecer la alarma (mismo requestCode: itemId)
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            itemId,
+            itemId, // ⬅️ CRUCIAL: Usar el itemId como requestCode
             intent,
-            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        pendingIntent?.let {
-            alarmManager.cancel(it)
-        }
+        alarmManager.cancel(pendingIntent)
+        Log.d("ItemViewModel", "Recordatorio para Item ID $itemId cancelado.")
     }
-    // ===================================
-
 
     fun saveItem(item: Item) {
         viewModelScope.launch {
@@ -292,7 +303,7 @@ class ItemViewModel(
             try {
                 deleteMediaFiles(item)
                 repository.delete(item)
-                cancelNotification(item.id, getApplication<Application>().applicationContext) // Cancelar la alarma
+                cancelNotification(item.id) // ANTES: cancelNotification(item.id, getApplication().applicationContext)
                 loadAllItems()
                 if (_currentItemState.value?.id == item.id) {
                     clearCurrentItem()
@@ -312,8 +323,7 @@ class ItemViewModel(
 
                     // Si se marca como completada, se cancela; si se desmarca, se reagenda.
                     if (updatedTask.isCompleted) {
-                        cancelNotification(updatedTask.id, getApplication<Application>().applicationContext)
-                    } else {
+                        cancelNotification(updatedTask.id) // ANTES: cancelNotification(updatedTask.id, getApplication().applicationContext)                    } else {
                         scheduleNotification(updatedTask.copy(dueDateTimestamp = _dueDate.value))
                     }
                 }
@@ -431,8 +441,25 @@ class ItemViewModel(
         _tempFileUri.value = null
 
     }
+    //NOTIFICACION
 
+    fun updateItem(item: Item, newDueDateTimestamp: Long? = null) = viewModelScope.launch {
 
+        // 1. Crear una copia del Item con el nuevo timestamp (null para eliminar)
+        val itemToUpdate = item.copy(dueDateTimestamp = newDueDateTimestamp)
+
+        // 2. Guardar el Item actualizado en la base de datos (IMPORTANTE para la UI)
+        repository.update(itemToUpdate) // Esto debe setear dueDateTimestamp a NULL en Room
+        updateFormState(itemToUpdate)
+        // 3. Lógica de Notificación
+        if (newDueDateTimestamp == null) {
+            // Si el timestamp es null, CANCELAR la alarma
+            cancelNotification(item.id)
+        } else {
+            // Si el timestamp tiene un valor, (re)programar la alarma
+            scheduleNotification(itemToUpdate)
+        }
+    }
 
 
 
@@ -551,6 +578,8 @@ class ItemViewModel(
             _filePaths.value = _filePaths.value.filter { it != uriString }
         }
     }
+
+
     /*private fun deleteSingleMediaFileByPath(relativePath: String) {
         val context = getApplication<Application>().applicationContext
         val baseDir = context.filesDir

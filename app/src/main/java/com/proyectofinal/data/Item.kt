@@ -1,5 +1,6 @@
 package com.proyectofinal.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -11,13 +12,17 @@ data class Item(
     val isTask: Boolean = false,
     val isCompleted: Boolean = false,
     val timestamp: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "reminderTimestamps") // Nuevo nombre para claridad
+    val reminderTimestamps: List<Long> = emptyList(),
     // ⬇️ DEBES AGREGAR ESTE CAMPO PARA LA FECHA LÍMITE ⬇️
     val dueDateTimestamp: Long?,
 
     val photoPaths: List<String>,
     val videoPaths: List<String>,
     val audioPaths: List<String>,
-    val filePaths: List<String>
+    val filePaths: List<String>,
+
+
 
 
 )
