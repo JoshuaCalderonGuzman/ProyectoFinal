@@ -46,99 +46,98 @@ import com.proyectofinal.viewmodel.ItemViewModel
 @Composable
 fun HomeScreen(
     viewModel: ItemViewModel,
-    onNoteClick: (Int) -> Unit,   // Navega a la pantalla de edición
-    onAddNewClick: () -> Unit,     // Navega a la pantalla de creación (id = 0)
+    onNoteClick: (Int) -> Unit,   // Móvil: abre pantalla completa
+    onAddNewClick: () -> Unit,    // Móvil: crear nuevo
     contentType: ContentType,
     navigationType: NavigationType
 ) {
-    // Estado global del ViewModel (Loading / Empty / Success / Error)
-
     val uiState by viewModel.uiState.collectAsState()
     val currentItem by viewModel.currentItemState.collectAsState()
-    //Estado local: id del ítem que está expandido
     var expandedItemId by rememberSaveable { mutableStateOf<Int?>(null) }
 
-    val onAddAction: () -> Unit = {
+    val onNew = {
         if (contentType == ContentType.LIST_AND_DETAIL) {
-            // Caso Tablet: Inicia la creación en el panel de detalle
-            viewModel.startNewItemCreation() //
+            viewModel.startNewItemCreation()  // En tablet carga panel derecho
         } else {
-            // Caso Móvil: Navega a la pantalla completa de creación
-            onAddNewClick()
+            onAddNewClick()                   // En móvil navega
         }
-    }
-
-    val listHeaderColor = if (contentType == ContentType.LIST_AND_DETAIL) {
-        Color.Black // Modo Tablet: Fondo del 40% es blanco, Texto debe ser NEGRO.
-    } else {
-        Color.White // Modo Móvil: Fondo es oscuro (del darkColorScheme), Texto debe ser BLANCO.
     }
 
     MaterialTheme(
         colorScheme = darkColorScheme(),
-        typography = Typography(
-            titleLarge = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-            bodyLarge = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp)
-        ),
     ) {
+
         if (contentType == ContentType.LIST_AND_DETAIL) {
-            // TABLET: Lista + Detalle
-            Row(modifier = Modifier.fillMaxSize()) {
-                // Lista (40%)
-                Box(modifier = Modifier.weight(0.4f).fillMaxHeight().background(Color.White)){
+            // -----------------------------------------
+            //                TABLET MODE
+            // -----------------------------------------
+            Row(Modifier.fillMaxSize()) {
+
+                // ----------- LISTA -----------
+                Box(
+                    modifier = Modifier
+                        .weight(0.40f)
+                        .fillMaxHeight()
+                        .background(Color.White)
+                ) {
                     HomeListContent(
                         uiState = uiState,
                         expandedItemId = expandedItemId,
                         onExpand = { expandedItemId = if (expandedItemId == it) null else it },
-                        onNoteClick = onNoteClick,
-                        onAddNewClick = onAddAction,
+                        onNoteClick = { id ->
+                            viewModel.loadItemById(id)
+                        },
+                        onAddNewClick = onNew,
                         onDelete = { viewModel.deleteItem(it) },
                         onToggleComplete = { viewModel.toggleTaskCompletion(it) },
-                        headerColor = listHeaderColor,
+                        headerColor = Color.Black,
                         modifier = Modifier.fillMaxSize()
-
                     )
-                    // Botón Flotante colocado DENTRO del Box (40%)
+
                     FloatingAddButton(
-                        onClick = onAddAction,
+                        onClick = onNew,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(16.dp)
-
                     )
-
                 }
 
 
-                // Detalle (60%)
-                currentItem?.let { item ->
-                    NotaDetailContent(
-                        item = item,
-                        onSave = { updatedItem ->
-                            viewModel.saveItem(updatedItem)
-                        },
-                        onDelete = {
-                            viewModel.deleteItem(item)
-                            viewModel.clearCurrentItem()
-                        },
-                        modifier = Modifier
-                            .weight(0.6f)
-                            .fillMaxHeight()
-                            .background(MaterialTheme.colorScheme.surface)
-                    )
-                } ?: Box(
+                // ----------- PANEL DETALLE -----------
+                Box(
                     modifier = Modifier
-                        .weight(0.6f)
+                        .weight(0.60f)
                         .fillMaxHeight()
                         .background(MaterialTheme.colorScheme.surface),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Selecciona un elemento", color = Color.White.copy(alpha = 0.6f))
+                    if (currentItem != null) {
+
+                        // ¡Usamos el NUEVO NotaDetailContent completo!
+                        NotaScreen(
+                            viewModel = viewModel,
+                            onBack = { viewModel.clearCurrentItem() },
+                            isFullScreen = false,
+                            itemId = currentItem!!.id
+                        )
+
+                    } else {
+                        Text(
+                            "Selecciona un elemento o crea uno nuevo",
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                    }
                 }
             }
-        }else{
+
+        } else {
+            // -----------------------------------------
+            //                MOBILE MODE
+            // -----------------------------------------
             Scaffold(
-                floatingActionButton = { FloatingAddButton(onAddAction) },
+                floatingActionButton = {
+                    FloatingAddButton(onNew)
+                },
                 containerColor = MaterialTheme.colorScheme.background
             ) { paddingValues ->
                 HomeListContent(
@@ -146,16 +145,14 @@ fun HomeScreen(
                     expandedItemId = expandedItemId,
                     onExpand = { expandedItemId = if (expandedItemId == it) null else it },
                     onNoteClick = onNoteClick,
-                    onAddNewClick = onAddAction,
+                    onAddNewClick = onNew,
                     onDelete = { viewModel.deleteItem(it) },
                     onToggleComplete = { viewModel.toggleTaskCompletion(it) },
-                    headerColor = listHeaderColor,
+                    headerColor = Color.White,
                     modifier = Modifier.padding(paddingValues)
                 )
             }
         }
-
-
     }
 }
 

@@ -157,6 +157,8 @@ class ItemViewModel(
             }
         }
     }
+    fun loadItemById(id: Int) = loadItem(id)
+
 
     // Métodos para actualizar los campos desde la UI
     fun updateTitle(newTitle: String) { _title.value = newTitle }
