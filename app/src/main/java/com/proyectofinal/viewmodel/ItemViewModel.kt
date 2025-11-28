@@ -7,7 +7,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.FileProvider
@@ -222,7 +221,7 @@ class ItemViewModel(
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
         // -------------------------------
-        // 🔍 LOG 1: Inicio
+        // Inicio
         // -------------------------------
         Log.d("NOTIFICATION_DEBUG", "----------------------------------------")
         Log.d("NOTIFICATION_DEBUG", "INICIANDO scheduleNotification() para itemId=${item.id}")
@@ -239,17 +238,17 @@ class ItemViewModel(
         item.reminderTimestamps.forEach { timestamp ->
 
             // -------------------------------
-            // 🔍 LOG 2: validar timestamp
+            // validar timestamp
             // -------------------------------
             Log.d("NOTIFICATION_DEBUG", "Procesando timestamp=$timestamp (${Date(timestamp)})")
 
             if (timestamp <= System.currentTimeMillis()) {
-                Log.d("NOTIFICATION_DEBUG", "⏭️ Saltado: El recordatorio es del pasado.")
+                Log.d("NOTIFICATION_DEBUG", "Saltado: El recordatorio es del pasado.")
                 return@forEach
             }
 
             val pendingId = item.id + timestamp.hashCode()
-            Log.d("NOTIFICATION_DEBUG", "⚙️ Generando PendingIntent -> pendingId=$pendingId")
+            Log.d("NOTIFICATION_DEBUG", "Generando PendingIntent -> pendingId=$pendingId")
 
             val intent = Intent(context, NotificationReceiver::class.java).apply {
                 putExtra(NotificationReceiver.NOTIFICATION_ID_KEY, item.id)
@@ -259,17 +258,17 @@ class ItemViewModel(
 
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
-                pendingId,   // ID único por recordatorio
+                pendingId,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
             // -------------------------------
-            // 🔍 LOG 3: programando alarma
+            // programando alarma
             // -------------------------------
             Log.d(
                 "NOTIFICATION_DEBUG",
-                "⏰ PROGRAMANDO alarma: " +
+                "PROGRAMANDO alarma: " +
                         "itemId=${item.id}, " +
                         "pendingId=$pendingId, " +
                         "fecha=${Date(timestamp)}, " +
@@ -283,37 +282,38 @@ class ItemViewModel(
             )
         }
 
-        Log.d("NOTIFICATION_DEBUG", "✔ scheduleNotification() FINALIZADO para itemId=${item.id}")
+        Log.d("NOTIFICATION_DEBUG", "scheduleNotification() FINALIZADO para itemId=${item.id}")
         Log.d("NOTIFICATION_DEBUG", "----------------------------------------")
     }
 
 
     // ===================================
     @SuppressLint("UnspecifiedImmutableFlag")
-    fun cancelNotification(itemId: Int) { //  AHORA ES PÚBLICA Y NO NECESITA CONTEXTO EXTERNO
+    fun cancelNotification(pendingId: Int) {
         val context = getApplication<Application>().applicationContext
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-        val intent = Intent(context, NotificationReceiver::class.java).apply {
-            // Usa el ID del item como ID de la notificación para cancelarla
-            putExtra(NotificationReceiver.NOTIFICATION_ID_KEY, itemId)
-        }
+        val intent = Intent(context, NotificationReceiver::class.java)
+
 
         // El PendingIntent debe ser IDÉNTICO al que se usó para establecer la alarma (mismo requestCode: itemId)
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            itemId, // CRUCIAL: Usar el itemId como requestCode
+            pendingId,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         alarmManager.cancel(pendingIntent)
-        Log.d("ItemViewModel", "Recordatorio para Item ID $itemId cancelado.")
+        Log.d("ItemViewModel", "Recordatorio para Item ID $pendingId cancelado.")
     }
 
     fun saveItem(item: Item) {
         viewModelScope.launch {
             try {
+                val oldItem = if (item.id != 0) {
+                    repository.getItemById(item.id)
+                } else null
 
                 // Copia el item con los valores actuales del StateFlow del ViewModel
                 val itemToSave = item.copy(
@@ -334,6 +334,7 @@ class ItemViewModel(
                     val newId = repository.insert(itemToSave)
                     scheduleNotification(itemToSave.copy(id = newId.toInt()))
                 } else {
+                    if (oldItem != null) cancelOldReminders(oldItem)
                     repository.update(itemToSave)
                     scheduleNotification(itemToSave) // Actualiza o reagenda
                 }
@@ -349,13 +350,11 @@ class ItemViewModel(
     fun deleteItem(item: Item) {
         viewModelScope.launch {
             try {
+                cancelAllNotificationsForItem(item)
                 deleteMediaFiles(item)
                 repository.delete(item)
-                cancelNotification(item.id) // ANTES: cancelNotification(item.id, getApplication().applicationContext)
                 loadAllItems()
-                if (_currentItemState.value?.id == item.id) {
-                    clearCurrentItem()
-                }
+                if (_currentItemState.value?.id == item.id) clearCurrentItem()
             } catch (e: Exception) {
                 _uiState.value = ItemUiState.Error("Error al eliminar: ${e.message}")
             }
@@ -371,7 +370,8 @@ class ItemViewModel(
 
                     // Si se marca como completada, se cancela; si se desmarca, se reagenda.
                     if (updatedTask.isCompleted) {
-                        cancelNotification(updatedTask.id) // ANTES: cancelNotification(updatedTask.id, getApplication().applicationContext)                    } else {
+                        cancelAllNotificationsForItem(updatedTask)
+                    } else {
                         scheduleNotification(updatedTask.copy(dueDateTimestamp = _dueDate.value))
                     }
                 }
@@ -507,22 +507,54 @@ class ItemViewModel(
 
     }
     //NOTIFICACION
+    fun removeReminder(timestamp: Long) {
+        _reminders.value = _reminders.value.filter { it != timestamp }
 
-    fun updateItem(item: Item, newDueDateTimestamp: Long? = null) = viewModelScope.launch {
+    }
 
-        // 1. Crear una copia del Item con el nuevo timestamp (null para eliminar)
-        val itemToUpdate = item.copy(dueDateTimestamp = newDueDateTimestamp)
+    fun setSearchQuery(value: String) {
+        searchQuery.value = value
+    }
+    fun cancelAllNotificationsForItem(item: Item) {
+        item.reminderTimestamps.forEach { timestamp ->
+            val pendingId = item.id + timestamp.hashCode()
+            cancelNotification(pendingId)
+        }
+    }
+    fun cancelReminderForItem(item: Item, timestamp: Long) {
+        viewModelScope.launch {
+            try {
+                // 1) Cancelar la alarma programada (si existe)
+                if (item.id > 0) {
+                    val pendingId = item.id + timestamp.hashCode()
+                    cancelNotification(pendingId)
+                }
 
-        // 2. Guardar el Item actualizado en la base de datos (IMPORTANTE para la UI)
-        repository.update(itemToUpdate) // Esto debe setear dueDateTimestamp a NULL en Room
-        updateFormState(itemToUpdate)
-        // 3. Lógica de Notificación
-        if (newDueDateTimestamp == null) {
-            // Si el timestamp es null, CANCELAR la alarma
-            cancelNotification(item.id)
-        } else {
-            // Si el timestamp tiene un valor, (re)programar la alarma
-            scheduleNotification(itemToUpdate)
+                // 2) Actualizar la lista de recordatorios en memoria y en BD (si el item está guardado)
+                val newReminders = item.reminderTimestamps.filter { it != timestamp }
+                _reminders.value = newReminders.sorted()
+
+                if (item.id > 0) {
+                    val updated = item.copy(reminderTimestamps = newReminders)
+                    repository.update(updated)
+                    // Si tienes currentItem cargado, asegúrate de sincronizarlo también
+                    if (_currentItemState.value?.id == item.id) {
+                        _currentItemState.value = updated
+                    }
+                }
+
+            } catch (e: Exception) {
+                Log.e("ItemViewModel", "Error cancelando recordatorio: ${e.message}")
+                // opcional: propagar error al uiState
+                _uiState.value = ItemUiState.Error("Error al cancelar recordatorio: ${e.message}")
+            }
+        }
+    }
+    private fun cancelOldReminders(oldItem: Item) {
+        oldItem.reminderTimestamps.forEach { oldTimestamp ->
+            val pendingId = oldItem.id + oldTimestamp.hashCode()
+            cancelNotification(pendingId)
+            Log.d("NOTIF", "Cancelando recordatorio viejo: $pendingId → ${Date(oldTimestamp)}")
         }
     }
 
@@ -656,13 +688,9 @@ class ItemViewModel(
 
     }
 
-    fun removeReminder(timestamp: Long) {
-        _reminders.value = _reminders.value.filter { it != timestamp }
-    }
 
-    fun setSearchQuery(value: String) {
-        searchQuery.value = value
-    }
+
+
 
 
     /*private fun deleteSingleMediaFileByPath(relativePath: String) {

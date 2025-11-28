@@ -98,7 +98,6 @@ fun NotaScreen(
     }
 
     // Objeto base para saber el ID (si es 0 es nuevo)
-    // ⚠️ ATENCIÓN: Se asume que Item tiene un campo Long? llamado `dueDateTimestamp`
     val itemBase = currentItem ?: Item(
         id = 0,
         title = "",
@@ -106,11 +105,11 @@ fun NotaScreen(
         isTask = false,
         isCompleted = false,
         // timestamp se llena automáticamente
-        dueDateTimestamp = null,              // <-- Añadir
-        photoPaths = emptyList(),             // <-- Añadir
-        videoPaths = emptyList(),              // <-- Añadir
-        audioPaths = emptyList(),              // <-- Añadir
-        filePaths = emptyList()                // <-- Añadir
+        dueDateTimestamp = null,
+        photoPaths = emptyList(),
+        videoPaths = emptyList(),
+        audioPaths = emptyList(),
+        filePaths = emptyList()
     )    // Función para Guardar
     val saveAction = {
         val toSave = itemBase.copy(
@@ -1057,6 +1056,7 @@ fun ReminderManagementSection(
 
     val reminders by viewModel.reminders.collectAsState()
 
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1111,7 +1111,8 @@ fun ReminderManagementSection(
                 //Borrar
                 IconButton(
                     onClick = {
-                        viewModel.removeReminder(timestamp)
+                        viewModel.cancelReminderForItem(item, timestamp)
+
                         Toast.makeText(context, "Recordatorio eliminado.", Toast.LENGTH_SHORT).show()
                     }
                 ) {
