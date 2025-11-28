@@ -53,6 +53,7 @@ fun NotaScreen(
     isFullScreen: Boolean = true,
     itemId: Int
 ) {
+    val reminderBeingEdited = remember { mutableStateOf<Long?>(null) }
     // ESTADO GLOBAL DEL VIEWMODEL
     val uiState by viewModel.uiState.collectAsState()
     val currentItem by viewModel.currentItemState.collectAsState()
@@ -65,7 +66,6 @@ fun NotaScreen(
     // Estado para la Fecha Límite desde el ViewModel
     val dueDateTimestamp by viewModel.dueDate.collectAsState()
     // =============================================
-    val reminderBeingEdited = remember { mutableStateOf<Long?>(null) }
 
 
 
@@ -262,6 +262,20 @@ fun NotaScreen(
                 saveAction()
             }
         )
+    }
+    if (showReminderManagement.value) {
+        ModalBottomSheet(
+            onDismissRequest = { showReminderManagement.value = false }
+        ) {
+            ReminderManagementSection(
+                item = itemBase,
+                viewModel = viewModel,
+                context = context,
+                onDismiss = { showReminderManagement.value = false },
+                onScheduleReminder = onCalendarClick,
+                reminderBeingEdited = reminderBeingEdited
+            )
+        }
     }
 }
 
@@ -698,16 +712,7 @@ private fun NotaDetailContent(
             )
 
         }
-        if (showReminderManagement) {
-            Spacer(Modifier.height(16.dp)) // Añadir un espaciador para separación visual
-            ReminderManagementSection(
-                item = item,
-                viewModel = viewModel,
-                context = context,
-                onDismiss = { onShowReminderManagement(false) },
-                onScheduleReminder = onCalendarClick // Este es el callback que abre el DatePicker
-            )
-        }
+
 
 
         // Botón de guardar (solo visible si no hay TopBar, e.g. tablet mode o landscape sin scaffold topbar)
@@ -1046,11 +1051,11 @@ fun ReminderManagementSection(
     viewModel: ItemViewModel,
     context: Context,
     onDismiss: () -> Unit,
-    onScheduleReminder: () -> Unit
+    onScheduleReminder: () -> Unit,
+    reminderBeingEdited: MutableState<Long?>
 ) {
 
     val reminders by viewModel.reminders.collectAsState()
-    val reminderBeingEdited = remember { mutableStateOf<Long?>(null) }
 
     Column(
         modifier = Modifier
