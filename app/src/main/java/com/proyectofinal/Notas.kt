@@ -65,6 +65,8 @@ fun NotaScreen(
     // Estado para la Fecha Límite desde el ViewModel
     val dueDateTimestamp by viewModel.dueDate.collectAsState()
     // =============================================
+    val reminderBeingEdited = remember { mutableStateOf<Long?>(null) }
+
 
 
 
@@ -132,23 +134,36 @@ fun NotaScreen(
     val showTimePicker = remember { mutableStateOf(false) }
     val showReminderManagement = remember { mutableStateOf(false) }
 
-    val onDateSelected: (year: Int, month: Int, day: Int) -> Unit = { year, month, day ->
-        val calendar = Calendar.getInstance()
-        calendar.set(year, month, day, 0, 0, 0) // Inicializa la hora
-        viewModel.updateDueDate(calendar.timeInMillis)
-        showTimePicker.value = true // Mostrar el selector de hora después de la fecha
+    val tempDate = remember { mutableStateOf<Long?>(null) }
+
+    val onDateSelected = { y: Int, m: Int, d: Int ->
+        val cal = Calendar.getInstance().apply {
+            set(y, m, d, 0, 0, 0)
+        }
+        tempDate.value = cal.timeInMillis
+        showTimePicker.value = true
     }
 
-    val onTimeSelected: (hour: Int, minute: Int) -> Unit = { hour, minute ->
-        // Si ya hay una fecha seleccionada, la actualiza con la hora
-        dueDateTimestamp?.let { currentTimestamp ->
-            val calendar = Calendar.getInstance().apply { timeInMillis = currentTimestamp }
-            calendar.set(Calendar.HOUR_OF_DAY, hour)
-            calendar.set(Calendar.MINUTE, minute)
-            calendar.set(Calendar.SECOND, 0)
-            viewModel.updateDueDate(calendar.timeInMillis)
+    val onTimeSelected = let@{ h: Int, min: Int ->
+        val initial = tempDate.value ?: return@let
+        val cal = Calendar.getInstance().apply { timeInMillis = initial }
+        cal.set(Calendar.HOUR_OF_DAY, h)
+        cal.set(Calendar.MINUTE, min)
+
+        val newTimestamp = cal.timeInMillis
+
+        if (reminderBeingEdited.value != null) {
+            // Editando un recordatorio existente
+            viewModel.removeReminder(reminderBeingEdited.value!!)
+            viewModel.addReminder(newTimestamp)
+            reminderBeingEdited.value = null
+        } else {
+            // Añadiendo uno nuevo
+            viewModel.addReminder(newTimestamp)
         }
     }
+
+
 
     val onCalendarClick = {
         if (isTask) {
@@ -250,33 +265,6 @@ fun NotaScreen(
     }
 }
 
-// === COMPONENTES AUXILIARES (Sin Cambios) ===
-
-@Composable
-fun ArchivoCard(nombre: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            modifier = Modifier
-                .size(76.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-        )
-        Text(text = nombre, style = MaterialTheme.typography.bodySmall)
-    }
-}
-
-@Composable
-fun AddArchivoButton() {
-    Box(
-        modifier = Modifier
-            .size(76.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.agregar_archivos))
-    }
-}
 
 @Composable
 fun TareaItem(
@@ -1060,7 +1048,10 @@ fun ReminderManagementSection(
     onDismiss: () -> Unit,
     onScheduleReminder: () -> Unit
 ) {
-    // Aquí va todo el código que te di en la respuesta anterior
+
+    val reminders by viewModel.reminders.collectAsState()
+    val reminderBeingEdited = remember { mutableStateOf<Long?>(null) }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1068,32 +1059,25 @@ fun ReminderManagementSection(
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(16.dp)
     ) {
-        // ... (Contenido de la sección: Text, Button para añadir/modificar, Row para eliminar)
-        Text(
-            text = "Recordatorios",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+        Text("Recordatorios", style = MaterialTheme.typography.titleMedium)
 
-        // 1. Botón para programar/añadir un recordatorio
+        // BOTÓN PARA AÑADIR OTRO RECORDATORIO
         Button(
             onClick = onScheduleReminder,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Icon(Icons.Outlined.Add, contentDescription = "Añadir recordatorio")
+            Icon(Icons.Outlined.Add, contentDescription = null)
             Spacer(Modifier.width(8.dp))
-            Text("Añadir/Modificar Recordatorio")
+            Text("Añadir recordatorio")
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(Modifier.height(12.dp))
 
-        // 2. LISTA DEL RECORDATORIO ACTIVO
-        if (item.dueDateTimestamp != null) {
-            val dateText = item.dueDateTimestamp?.let {
-                android.text.format.DateFormat.getDateFormat(context).format(it) + " " +
-                        android.text.format.DateFormat.getTimeFormat(context).format(it)
-            } ?: "Fecha no disponible"
+        // LISTA COMPLETA DE RECORDATORIOS
+        reminders.sorted().forEach { timestamp ->
+            val dateText =
+                android.text.format.DateFormat.getDateFormat(context).format(timestamp) + " " +
+                        android.text.format.DateFormat.getTimeFormat(context).format(timestamp)
 
             Row(
                 modifier = Modifier
@@ -1103,40 +1087,46 @@ fun ReminderManagementSection(
                     .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Muestra el recordatorio
                 Text(
-                    text = "Activo: $dateText",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium
+                    text = dateText,
+                    modifier = Modifier.weight(1f)
                 )
-
-                // Botón de ELIMINAR Recordatorio
+                //Editar
                 IconButton(
                     onClick = {
-                        // Llama a la función de cancelación en el ViewModel (Asumiendo que ya la implementaste)
-                        viewModel.updateItem(item, newDueDateTimestamp = null)
+                        reminderBeingEdited.value = timestamp
+                        onScheduleReminder()
+                    }
+                ) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Editar recordatorio"
+                    )
+                }
+                //Borrar
+                IconButton(
+                    onClick = {
+                        viewModel.removeReminder(timestamp)
                         Toast.makeText(context, "Recordatorio eliminado.", Toast.LENGTH_SHORT).show()
                     }
                 ) {
                     Icon(
-                        Icons.Filled.Delete,
-                        contentDescription = "Eliminar recordatorio",
+                        Icons.Default.Delete,
+                        contentDescription = "Borrar",
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
             }
-        } else {
-            Text("No hay recordatorios activos para esta nota.", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(8.dp))
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // 3. Botón para cerrar la sección
-        Button(onClick = onDismiss) {
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
             Text("Cerrar")
         }
     }
 }
+
 
 
 

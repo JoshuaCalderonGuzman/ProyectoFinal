@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.proyectofinal.R // Asegúrate de tener tu archivo R
 
@@ -19,10 +20,19 @@ class NotificationReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        Log.d("NOTIFICATION_DEBUG", "----------------------------------------")
+        Log.d("NOTIFICATION_DEBUG", "🚨 NOTIFICATION RECEIVER ACTIVADO")
+        Log.d("NOTIFICATION_DEBUG", "Intent recibido desde AlarmManager")
+        Log.d("NOTIFICATION_DEBUG", "----------------------------------------")
         // 1. Extraer los datos de la tarea del Intent
         val notificationId = intent.getIntExtra(NOTIFICATION_ID_KEY, 0)
         val title = intent.getStringExtra(NOTIFICATION_TITLE_KEY) ?: context.getString(R.string.recordatorio_tarea)
         var description: String = intent.getStringExtra(NOTIFICATION_DESC_KEY) ?: context.getString(R.string.tienes_una_tarea_pendiente)
+
+        Log.d("NOTIFICATION_DEBUG", "📌 Datos recibidos:")
+        Log.d("NOTIFICATION_DEBUG", "ID = $notificationId")
+        Log.d("NOTIFICATION_DEBUG", "Título = $title")
+        Log.d("NOTIFICATION_DEBUG", "Descripción = $description")
 
         // 2. Crear y mostrar la notificación
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -35,6 +45,8 @@ class NotificationReceiver : BroadcastReceiver() {
                 description = context.getString(R.string.descripcion_canal_recordatorios)
             }
             notificationManager.createNotificationChannel(channel)
+            Log.d("NOTIFICATION_DEBUG", "📡 Canal de notificación creado/verificado")
+
         }
 
         // Construir la notificación
@@ -48,5 +60,7 @@ class NotificationReceiver : BroadcastReceiver() {
 
         // Mostrar la notificación
         notificationManager.notify(notificationId, notification)
+        Log.d("NOTIFICATION_DEBUG", "🔔 Notificación mostrada correctamente (ID = $notificationId)")
+        Log.d("NOTIFICATION_DEBUG", "----------------------------------------")
     }
 }

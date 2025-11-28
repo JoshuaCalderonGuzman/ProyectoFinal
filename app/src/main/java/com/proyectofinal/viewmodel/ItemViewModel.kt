@@ -23,6 +23,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 //Sealed class para representar los estados de la UI
 sealed class ItemUiState {
@@ -174,7 +177,7 @@ class ItemViewModel(
             videoPaths = emptyList(),
             audioPaths = emptyList(),
             filePaths = emptyList(),
-            reminderTimestamps = emptyList(),
+            reminderTimestamps = _reminders.value
         )
         _currentItemState.value = newItem
         updateFormState(newItem)
@@ -208,36 +211,74 @@ class ItemViewModel(
 
     @SuppressLint("ScheduleExactAlarm")
     private fun scheduleNotification(item: Item) {
+
         val context = getApplication<Application>().applicationContext
-
-        // Si la fecha es inválida/nula, no es tarea, está completada o la fecha ya pasó, cancela la alarma.
-        if (item.dueDateTimestamp == null || !item.isTask || item.isCompleted || item.dueDateTimestamp <= System.currentTimeMillis()) {
-            cancelNotification(item.id)
-            return
-        }
-
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-        val intent = Intent(context, NotificationReceiver::class.java).apply {
-            // Pasar los datos de la tarea
-            putExtra(NotificationReceiver.NOTIFICATION_ID_KEY, item.id)
-            putExtra(NotificationReceiver.NOTIFICATION_TITLE_KEY, item.title)
-            putExtra(NotificationReceiver.NOTIFICATION_DESC_KEY, item.description ?: "")
+        // -------------------------------
+        // 🔍 LOG 1: Inicio
+        // -------------------------------
+        Log.d("NOTIFICATION_DEBUG", "----------------------------------------")
+        Log.d("NOTIFICATION_DEBUG", "INICIANDO scheduleNotification() para itemId=${item.id}")
+        Log.d("NOTIFICATION_DEBUG", "Recordatorios totales: ${item.reminderTimestamps.size}")
+        Log.d("NOTIFICATION_DEBUG", "----------------------------------------")
+
+        // Cancelar alarmas previas
+        item.reminderTimestamps.forEach { timestamp ->
+            val pendingId = item.id + timestamp.hashCode()
+            Log.d("NOTIFICATION_DEBUG", "Cancelando alarma previa -> pendingId=$pendingId, fecha=${Date(timestamp)}")
+            cancelNotification(pendingId)
         }
 
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            item.id, // <--- Este es el Request Code
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        item.reminderTimestamps.forEach { timestamp ->
 
-        // Agendar la alarma en el tiempo exacto
-        alarmManager.setExactAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            item.dueDateTimestamp,
-            pendingIntent
-        )
+            // -------------------------------
+            // 🔍 LOG 2: validar timestamp
+            // -------------------------------
+            Log.d("NOTIFICATION_DEBUG", "Procesando timestamp=$timestamp (${Date(timestamp)})")
+
+            if (timestamp <= System.currentTimeMillis()) {
+                Log.d("NOTIFICATION_DEBUG", "⏭️ Saltado: El recordatorio es del pasado.")
+                return@forEach
+            }
+
+            val pendingId = item.id + timestamp.hashCode()
+            Log.d("NOTIFICATION_DEBUG", "⚙️ Generando PendingIntent -> pendingId=$pendingId")
+
+            val intent = Intent(context, NotificationReceiver::class.java).apply {
+                putExtra(NotificationReceiver.NOTIFICATION_ID_KEY, item.id)
+                putExtra(NotificationReceiver.NOTIFICATION_TITLE_KEY, item.title)
+                putExtra(NotificationReceiver.NOTIFICATION_DESC_KEY, item.description ?: "")
+            }
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                pendingId,   // ID único por recordatorio
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // -------------------------------
+            // 🔍 LOG 3: programando alarma
+            // -------------------------------
+            Log.d(
+                "NOTIFICATION_DEBUG",
+                "⏰ PROGRAMANDO alarma: " +
+                        "itemId=${item.id}, " +
+                        "pendingId=$pendingId, " +
+                        "fecha=${Date(timestamp)}, " +
+                        "horaExacta=${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(timestamp))}"
+            )
+
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                timestamp,
+                pendingIntent
+            )
+        }
+
+        Log.d("NOTIFICATION_DEBUG", "✔ scheduleNotification() FINALIZADO para itemId=${item.id}")
+        Log.d("NOTIFICATION_DEBUG", "----------------------------------------")
     }
 
 
@@ -278,7 +319,8 @@ class ItemViewModel(
                     photoPaths = _photoPaths.value,
                     videoPaths = _videoPaths.value,
                     audioPaths = _audioPaths.value,
-                    filePaths = _filePaths.value
+                    filePaths = _filePaths.value,
+                    reminderTimestamps = _reminders.value
                 )
 
                 if (itemToSave.id == 0) {
@@ -337,15 +379,32 @@ class ItemViewModel(
     // Limpiar estado de ítem actual y formulario
     fun clearCurrentItem() {
         _currentItemState.value = null
+
+        // Reset campos básicos
         _title.value = ""
         _description.value = ""
         _isTask.value = false
         _isCompleted.value = false
-        _dueDate.value = null // Limpiar
+        _dueDate.value = null
+
+        // Reset multimedia
         _photos.value = emptyList()
         _videos.value = emptyList()
+        _audioPaths.value = emptyList()
+        _filePaths.value = emptyList()
         _photoPaths.value = emptyList()
         _videoPaths.value = emptyList()
+
+        _reminders.value = emptyList()
+
+        // limpiar temporales
+        _tempPhotoUri.value = null
+        _tempVideoUri.value = null
+        _tempAudioUri.value = null
+        _tempFileUri.value = null
+        _tempPhotoPath.value = null
+        _tempVideoPath.value = null
+        _tempAudioPath.value = null
     }
     //FOTO
     // Genera una URI segura para tomar foto
@@ -577,6 +636,22 @@ class ItemViewModel(
 
             _filePaths.value = _filePaths.value.filter { it != uriString }
         }
+    }
+    fun addReminder(timestamp: Long) {
+        // 1. Agregar a la lista
+        _reminders.value = _reminders.value + timestamp
+
+        // 2. Si el item YA existe en BD → programar de inmediato
+        val item = _currentItemState.value
+        if (item != null && item.id > 0) {
+            val updated = item.copy(reminderTimestamps = _reminders.value)
+            scheduleNotification(updated)
+        }
+
+    }
+
+    fun removeReminder(timestamp: Long) {
+        _reminders.value = _reminders.value.filter { it != timestamp }
     }
 
 
