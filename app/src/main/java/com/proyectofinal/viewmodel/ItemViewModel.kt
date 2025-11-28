@@ -9,6 +9,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
@@ -115,6 +116,9 @@ class ItemViewModel(
     private val _tempFileUri = MutableStateFlow<Uri?>(null)
     val tempFileUri: StateFlow<Uri?> = _tempFileUri.asStateFlow()
     val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
+
+    var searchQuery = mutableStateOf("")
+        private set
 
 
     init {
@@ -654,6 +658,10 @@ class ItemViewModel(
 
     fun removeReminder(timestamp: Long) {
         _reminders.value = _reminders.value.filter { it != timestamp }
+    }
+
+    fun setSearchQuery(value: String) {
+        searchQuery.value = value
     }
 
 

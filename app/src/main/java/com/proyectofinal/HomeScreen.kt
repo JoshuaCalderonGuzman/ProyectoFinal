@@ -68,9 +68,7 @@ fun HomeScreen(
     ) {
 
         if (contentType == ContentType.LIST_AND_DETAIL) {
-            // -----------------------------------------
             //                TABLET MODE
-            // -----------------------------------------
             Row(Modifier.fillMaxSize()) {
 
                 // ----------- LISTA -----------
@@ -81,6 +79,7 @@ fun HomeScreen(
                         .background(Color.White)
                 ) {
                     HomeListContent(
+                        viewModel = viewModel,
                         uiState = uiState,
                         expandedItemId = expandedItemId,
                         onExpand = { expandedItemId = if (expandedItemId == it) null else it },
@@ -113,7 +112,7 @@ fun HomeScreen(
                 ) {
                     if (currentItem != null) {
 
-                        // ¡Usamos el NUEVO NotaDetailContent completo!
+                        // Usamos el NUEVO NotaDetailContent completo!
                         NotaScreen(
                             viewModel = viewModel,
                             onBack = { viewModel.clearCurrentItem() },
@@ -131,9 +130,7 @@ fun HomeScreen(
             }
 
         } else {
-            // -----------------------------------------
             //                MOBILE MODE
-            // -----------------------------------------
             Scaffold(
                 floatingActionButton = {
                     FloatingAddButton(onNew)
@@ -141,6 +138,7 @@ fun HomeScreen(
                 containerColor = MaterialTheme.colorScheme.background
             ) { paddingValues ->
                 HomeListContent(
+                    viewModel = viewModel,
                     uiState = uiState,
                     expandedItemId = expandedItemId,
                     onExpand = { expandedItemId = if (expandedItemId == it) null else it },
@@ -314,11 +312,13 @@ fun ItemRow(
 //COMPONENTES AUXILIARES
 
 @Composable
-fun SearchBar() {
-    val textState = androidx.compose.runtime.remember { mutableStateOf("") }
+fun SearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit
+) {
     OutlinedTextField(
-        value = textState.value,
-        onValueChange = { textState.value = it },
+        value = query,
+        onValueChange = onQueryChange,
         placeholder = { Text(stringResource(R.string.buscar)) },
         shape = RoundedCornerShape(50),
         modifier = Modifier
@@ -344,16 +344,6 @@ fun SectionHeader(title: String, icon: ImageVector? = null, headerColor: Color) 
     ) {
 
         Text(title, style = MaterialTheme.typography.titleMedium, color = headerColor)
-        if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = stringResource(R.string.refrescar),
-                modifier = Modifier
-                    .size(22.dp)
-                    .clickable { },
-                tint = headerColor
-            )
-        }
     }
 }
 
@@ -372,6 +362,7 @@ fun FloatingAddButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 
 @Composable
 private fun HomeListContent(
+    viewModel: ItemViewModel,
     uiState: ItemUiState,
     expandedItemId: Int?,
     onExpand: (Int) -> Unit,
@@ -390,7 +381,10 @@ private fun HomeListContent(
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(8.dp))
-        SearchBar()
+        SearchBar(
+            query = viewModel.searchQuery.value,
+            onQueryChange = { viewModel.setSearchQuery(it) }
+        )
         Spacer(Modifier.height(16.dp))
 
         when (uiState) {
@@ -405,8 +399,14 @@ private fun HomeListContent(
                 }
             }
             is ItemUiState.Success -> {
-                val tasks = uiState.items.filter { it.isTask }
-                val notes = uiState.items.filter { !it.isTask }
+                val query = viewModel.searchQuery.value.lowercase()
+
+                val filteredItems = uiState.items.filter { item ->
+                    item.title.lowercase().contains(query) ||
+                            (item.description?.lowercase()?.contains(query) ?: false)
+                }
+                val tasks = filteredItems.filter { it.isTask }
+                val notes = filteredItems.filter { !it.isTask }
 
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (tasks.isNotEmpty()) {
