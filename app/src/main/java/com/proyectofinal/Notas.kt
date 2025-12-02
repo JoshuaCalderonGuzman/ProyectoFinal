@@ -43,6 +43,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import com.proyectofinal.util.AudioRecorder
+import android.provider.Settings
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -382,6 +383,8 @@ private fun NotaDetailContent(
     val audioPaths by viewModel.audioPaths.collectAsState()
     val filePaths by viewModel.filePaths.collectAsState()
     val isRecording by viewModel.isRecording.collectAsState()
+
+    val showPermissionDeniedDialog = remember { mutableStateOf(false) }
     //Inicia,os el grabador
     val audioRecorder = remember(context) { AudioRecorder(context) }
 
@@ -430,8 +433,7 @@ private fun NotaDetailContent(
             pendingAction.value?.invoke()
             pendingAction.value = null
         } else {
-            val denied = if (!cameraGranted && !audioGranted) "Cámara y Audio" else if (!cameraGranted) "Cámara" else "Audio"
-            Toast.makeText(context, "Permisos de $denied denegados.", Toast.LENGTH_LONG).show()
+            showPermissionDeniedDialog.value = true
             pendingAction.value = null
         }
     }
@@ -726,6 +728,35 @@ private fun NotaDetailContent(
                 Text(stringResource(R.string.guardar))
             }
         }
+    }
+    if (showPermissionDeniedDialog.value) {
+        AlertDialog(
+            onDismissRequest = { showPermissionDeniedDialog.value = false },
+            title = { Text(text = "Permisos requeridos") },
+            text = {
+                Text("Para grabar audio o video, esta aplicación necesita acceso a la cámara y al micrófono. Por favor, habilítalos en la configuración.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showPermissionDeniedDialog.value = false
+                        // Intent para ir a los Ajustes de la App
+                        val intent = Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", context.packageName, null)
+                        )
+                        context.startActivity(intent)
+                    }
+                ) {
+                    Text("Ir a Ajustes")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPermissionDeniedDialog.value = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
     if (showImageViewer && selectedImage != null) {
         ImageViewer(
